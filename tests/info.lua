@@ -1,9 +1,9 @@
 local json = require("json")
 
 local pack_info = {
-    Name = "newpkg",
+    Name = "testpack",
     -- Organization = "@betteridea"
-    Version = "latest" -- (optional)
+    -- Version = "latest" -- (optional)
 }
 
 if not APM then

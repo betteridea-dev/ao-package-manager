@@ -5,7 +5,7 @@ end
 Send({
     Target = APM,
     Data = json.encode({
-        Name = "newpkg",
+        Name = "testpack",
         -- Version = "1.0.0", ()
     }),
     Action = "Download"

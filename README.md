@@ -2,6 +2,7 @@
 
 The APM is a package manager for the AO the computer. It is designed to make it possible to easily install packages in processes.
 
+APM ID `wvWJYLcPcAgSZ4DM2xZaeSAhDKVrJmUNULP54LrTk3Q`
 
 ## APM Usage (For the process that is managing all the packages)
 
@@ -54,6 +55,19 @@ Load `apm-user.lua`, this will load necessary handlers to interact with the APM 
 ```lua
 .load apm-user.lua
 ```
+
+### Show all published pacakges
+
+Send a message to the APM process with the Action `GetAllPackages`
+
+```lua
+Send({
+    Target = APM,
+    Action = "GetAllPackages"
+})
+```
+
+Shortly you should receive a response with a json of all the published packages.
 
 ### Publish a new pacakge
 

@@ -95,15 +95,13 @@ function RegisterVendor(msg)
     assert(isValidOrganization(name), "❌ Invalid organization name, must be in the format @organization")
     assert(name ~= "@apm", "❌ @apm can't be registered")
 
-    print("OKOKOK")
-
     for row in db:nrows(string.format([[
         SELECT * FROM Vendors WHERE Name = "%s"
         ]], name)) do
         assert(nil, "❌ " .. name .. " already exists")
     end
 
-    print("registering name")
+    print("ℹ️ register requested for: " .. name .. " by " .. owner)
 
     db:exec(string.format([[
         INSERT INTO Vendors (Name, Owner) VALUES ("%s", '%s')
@@ -281,8 +279,6 @@ function Download(msg)
 
     assert(name, "❌ Package name is required")
 
-    print("ℹ️ Download request for " .. org .. "/" .. name .. "@" .. version .. " from " .. msg.From)
-
     local res
     if version == "latest" then
         res = sql_run(string.format([[
@@ -295,6 +291,8 @@ function Download(msg)
     end
 
     assert(#res > 0, "❌ " .. org .. "/" .. name .. "@" .. version .. " not found")
+
+    print("ℹ️ Download request for " .. org .. "/" .. name .. "@" .. version .. " from " .. msg.From)
 
     ao.send({
         Target = msg.From,
