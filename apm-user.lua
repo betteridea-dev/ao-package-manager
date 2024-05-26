@@ -1,8 +1,5 @@
 json = require("json")
 
--- Set process id of APM
-APM = "2yxybrYxDiAo5b56-6naMjgDrmaoDmUwy1_j82cbdco"
-
 -- common error handler
 function handle_run(func, msg)
     local ok, err = pcall(func, msg)
