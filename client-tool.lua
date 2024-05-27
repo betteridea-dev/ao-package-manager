@@ -292,6 +292,10 @@ end
 function APM.uninstall(name)
     assert(type(name) == "string", "Name must be a string")
 
+    if not APM.installed[name] then
+        return "❌ Package is not installed"
+    end
+
     _G.package.loaded[name] = nil
     table.remove(APM.installed, name)
 
