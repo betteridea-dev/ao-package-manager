@@ -10,7 +10,7 @@ The APM is a package manager for the AO the computer. It is designed to make it 
 
 </center>
 
-APM ID `wvWJYLcPcAgSZ4DM2xZaeSAhDKVrJmUNULP54LrTk3Q`
+APM ID `ZHUZLCewiKWFZPlq6cAHgES0XZyZgvUUVaKPLEcTsA8`
 
 ## Client Usage (For users wanting to install packages)
 

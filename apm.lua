@@ -148,6 +148,11 @@ function Publish(msg)
     local package_data = data.PackageData
     local owner = msg.From
 
+    -- Prevent publishing on registry process coz assignments have the Tag Action:Publish, which could cause a race condition?
+    if ao.id == msg.From then
+        error("❌ Registry cannot publish packages to itself")
+    end
+
     assert(type(name) == "string", "❌ Package name is required")
     assert(type(version) == "string", "❌ Package version is required")
     assert(type(vendor) == "string", "❌ vendor is required")
@@ -334,6 +339,11 @@ function Download(msg)
     local name = data.Name
     local version = data.Version or "latest"
     local vendor = data.Vendor or "@apm"
+
+    -- Prevent installation on registry process coz assignments have the Tag Action:Publish, which could cause a race condition?
+    if msg.From == ao.id then
+        error("❌ Cannot install pacakges on the registry process")
+    end
 
     assert(name, "❌ Package name is required")
 
