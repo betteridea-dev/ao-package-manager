@@ -6,11 +6,6 @@ db = db or sqlite3.open_memory()
 ------------------------------------------------------
 
 db:exec([[
-    -- CREATE TABLE IF NOT EXISTS Versions (
-    --     ID INTEGER PRIMARY KEY AUTOINCREMENT,
-    --     Name TEXT NOT NULL,
-    --     Version TEXT NOT NULL
-    -- );
     CREATE TABLE IF NOT EXISTS Packages (
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         Name TEXT NOT NULL,
@@ -54,7 +49,13 @@ function handle_run(func, msg)
     if not ok then
         local clean_err = err:match(":%d+: (.+)") or err
         print(msg.Action .. " - " .. err)
-        Handlers.utils.reply(clean_err)(msg)
+        -- Handlers.utils.reply(clean_err)(msg)
+        if not msg.Target == ao.id then
+            ao.send({
+                Target = msg.From,
+                Data = clean_err
+            })
+        end
     end
 end
 
@@ -290,8 +291,26 @@ Handlers.add(
 
 function GetAllPackages(msg)
     local packages = sql_run([[
-        SELECT DISTINCT Name, Vendor, RepositoryUrl, Description FROM Packages
+        WITH UniqueNames AS (
+    SELECT
+        Name,
+        MIN(Vendor) AS Vendor,
+        MAX(Version) AS Version,
+        MIN(Owner) AS Owner
+    FROM
+        Packages
+    GROUP BY
+        Name
+)
+SELECT
+    Vendor,
+    Name,
+    Version,
+    Owner
+FROM
+    UniqueNames;
     ]])
+    print(packages)
     -- Handlers.utils.reply(json.encode(packages))(msg)
     ao.send({
         Target = msg.From,

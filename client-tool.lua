@@ -7,7 +7,13 @@ function handle_run(func, msg)
     if not ok then
         local clean_err = err:match(":%d+: (.+)") or err
         print(msg.Action .. " - " .. err)
-        Handlers.utils.reply(clean_err)(msg)
+        -- Handlers.utils.reply(clean_err)(msg)
+        if not msg.Target == ao.id then
+            ao.send({
+                Target = msg.From,
+                Data = clean_err
+            })
+        end
     end
 end
 
@@ -198,7 +204,18 @@ function GetAllPackagesResponseHandler(msg)
 
     local p = "\n"
     for _, pkg in ipairs(data) do
-        p = p .. pkg.Vendor .. "/" .. pkg.Name .. " - " .. pkg.Description .. "\n"
+        -- p = p .. pkg.Vendor .. "/" .. pkg.Name .. " - " .. (pkg.Description or pkg.Owner) .. "  " .. pkg.RepositoryUrl .. "\n"
+        p = p .. pkg.Vendor .. "/" .. pkg.Name .. " - "
+        if pkg.Description then
+            p = p .. pkg.Description .. "  "
+        else
+            p = p .. pkg.Owner .. "  "
+        end
+        if pkg.RepositoryUrl then
+            p = p .. pkg.RepositoryUrl .. "\n"
+        else
+            p = p .. "No Repo Url" .. "\n"
+        end
     end
     print(p)
 end
