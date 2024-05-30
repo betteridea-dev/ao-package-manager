@@ -69,7 +69,24 @@ end
 
 function ListPackages()
     local p_str = "\n"
-    local p = sql_run([[SELECT Vendor,Name,Version,Owner FROM Packages]])
+    local p = sql_run([[WITH UniqueNames AS (
+    SELECT
+        Name,
+        MAX(Vendor) AS Vendor,
+        MAX(Version) AS Version,
+        MAX(Owner) AS Owner
+    FROM
+        Packages
+    GROUP BY
+        Name
+)
+SELECT
+    Vendor,
+    Name,
+    Version,
+    Owner
+FROM
+    UniqueNames;]])
 
     if #p == 0 then
         return "No packages found"
@@ -314,13 +331,18 @@ function Download(msg)
 
     assert(#res > 0, "❌ " .. vendor .. "/" .. name .. "@" .. version .. " not found")
 
-    print("ℹ️ Download request for " .. vendor .. "/" .. name .. "@" .. version .. " from " .. msg.From)
 
-    ao.send({
-        Target = msg.From,
-        Action = "DownloadResponse",
-        Data = json.encode(res[1])
+    Assign({
+        Processes = { msg.From },
+        Message = res[1].PkgID
     })
+
+    print("ℹ️ Download request for " .. vendor .. "/" .. name .. "@" .. version .. " from " .. msg.From)
+    -- ao.send({
+    --     Target = msg.From,
+    --     Action = "DownloadResponse",
+    --     Data = json.encode(res[1])
+    -- })
 end
 
 Handlers.add(

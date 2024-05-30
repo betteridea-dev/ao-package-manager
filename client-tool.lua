@@ -74,20 +74,26 @@ end
 
 ----------------------------------------
 
-function DownloadResponseHandler(msg)
+-- variant of the download response handler that supports assign()
+
+function PublishAssignDownloadResponseHandler(msg)
+    -- print(msg)
     local data = json.decode(msg.Data)
+    print(data)
     local vendor = data.Vendor
     local version = data.Version
-    local items = json.decode(base64.decode(data.Items))
+    local PkgData = data.PackageData
+    -- local items = json.decode(base64.decode(data.Items))
+    local items = PkgData.Items
     local name = data.Name
     if vendor ~= "@apm" then
         name = vendor .. "/" .. name
     end
-    local main = data.Main
+    local main = PkgData.Main
 
     local main_src
     for _, item in ipairs(items) do
-        item.data = base64.decode(item.data)
+        -- item.data = base64.decode(item.data)
         if item.meta.name == main then
             main_src = item.data
         end
@@ -116,10 +122,11 @@ function DownloadResponseHandler(msg)
 end
 
 Handlers.add(
-    "DownloadResponseHandler",
-    Handlers.utils.hasMatchingTag("Action", "DownloadResponse"),
+    "PublishAssignDownloadResponseHandler",
+    Handlers.utils.hasMatchingTag("Action", "Publish"),
     function(msg)
-        handle_run(DownloadResponseHandler, msg)
+        print("Assignment ran")
+        handle_run(PublishAssignDownloadResponseHandler, msg)
     end
 )
 
