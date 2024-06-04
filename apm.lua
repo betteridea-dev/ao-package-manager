@@ -14,29 +14,47 @@ db:exec([[
         Owner TEXT NOT NULL,
         README TEXT NOT NULL,
         PkgID TEXT NOT NULL,
-        Items TEXT NOT NULL,
+        Items VARCHAR NOT NULL,
         Authors_ TEXT NOT NULL,
         Dependencies TEXT NOT NULL,
         Main TEXT NOT NULL,
         Description TEXT NOT NULL,
         RepositoryUrl TEXT NOT NULL,
-        Updated INTEGER NOT NULL
+        Updated INTEGER NOT NULL,
+        Installs INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS Vendors (
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         Name TEXT NOT NULL,
         Owner TEXT NOT NULL
     );
+    -- TODO:
+    CREATE TABLE IF NOT EXISTS Latest10 (
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        PkgID TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS Featured (
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        PkgID TEXT NOT NULL
+    );
 ]])
 
 ------------------------------------------------------
+
+function hexencode(str)
+    return (str:gsub(".", function(char) return string.format("%02x", char:byte()) end))
+end
+
+function hexdecode(hex)
+    return (hex:gsub("%x%x", function(digits) return string.char(tonumber(digits, 16)) end))
+end
 
 function isValidVersion(variant)
     return variant:match("^%d+%.%d+%.%d+$")
 end
 
 function isValidPackageName(name)
-    return name:match("^%w+$")
+    return name:match("^[a-zA-Z0-9%-_]+$")
 end
 
 function isValidVendor(name)
@@ -53,7 +71,8 @@ function handle_run(func, msg)
         if not msg.Target == ao.id then
             ao.send({
                 Target = msg.From,
-                Data = clean_err
+                Data = clean_err,
+                Result = "error"
             })
         end
     end
@@ -72,10 +91,7 @@ function ListPackages()
     local p_str = "\n"
     local p = sql_run([[WITH UniqueNames AS (
     SELECT
-        Name,
-        MAX(Vendor) AS Vendor,
-        MAX(Version) AS Version,
-        MAX(Owner) AS Owner
+        MAX(Version) AS Version, *
     FROM
         Packages
     GROUP BY
@@ -85,7 +101,11 @@ SELECT
     Vendor,
     Name,
     Version,
-    Owner
+    Owner,
+    RepositoryUrl,
+    Description,
+    Installs,
+    PkgID
 FROM
     UniqueNames;]])
 
@@ -94,7 +114,8 @@ FROM
     end
 
     for _, pkg in ipairs(p) do
-        p_str = p_str .. pkg.Vendor .. "/" .. pkg.Name .. "@" .. pkg.Version .. " - " .. pkg.Owner .. "\n"
+        -- p_str = p_str .. pkg.Vendor .. "/" .. pkg.Name .. "@" .. pkg.Version .. " - " .. pkg.Owner .. "\n"
+        p_str = p_str .. pkg.Vendor .. "/" .. pkg.Name .. "@" .. pkg.Version .. " - " .. pkg.Owner .. " - " .. pkg.RepositoryUrl or "no url" .. " - " .. pkg.Description .. " - " .. pkg.Installs .. " installs\n"
     end
     return p_str
 end
@@ -170,7 +191,9 @@ function Publish(msg)
     assert(type(package_data.Dependencies) == "table", "❌ Dependencies(table) is required in PackageData")
     assert(type(package_data.Main) == "string", "❌ Main(string) is required in PackageData")
 
-    print(vendor)
+    package_data.Readme = hexencode(package_data.Readme)
+
+    -- print(vendor)
     -- if the package was published before, check the owner
     local existing = sql_run(string.format([[
         SELECT * FROM Packages WHERE Name = "%s" AND Vendor = "%s" ORDER BY Version DESC LIMIT 1
@@ -188,9 +211,13 @@ function Publish(msg)
             assert(type(key) == "string", "❌ meta key must be a string")
             assert(type(value) == "string", "❌ meta value must be a string")
         end
-        item.data = base64.encode(item.data)
+        -- item.data = base64.encode(item.data)
     end
-    package_data.Items = base64.encode(json.encode(package_data.Items))
+    -- package_data.Items = base64.encode(json.encode(package_data.Items))
+    -- print(package_data.Items)
+    -- print(hexencode(json.encode(package_data.Items)))
+    package_data.Items = hexencode(json.encode(package_data.Items))
+
     -- Items is valid
 
     -- check validity of Dependencies
@@ -231,13 +258,14 @@ function Publish(msg)
     ]], name, version, vendor, owner, package_data.Readme, msg.Id, package_data.Items, package_data.Authors,
         package_data.Dependencies, package_data.Main, package_data.Description, package_data.RepositoryUrl, os.time()))
 
-    assert(db_res == 0, "❌ " .. db:errmsg())
+    assert(db_res == 0, "❌[insert error] " .. db:errmsg())
 
-    print("ℹ️ publish requested for: " .. vendor .. "/" .. name .. "@" .. version .. " by " .. owner)
+    print("ℹ️ new package: " .. vendor .. "/" .. name .. "@" .. version .. " by " .. owner)
     -- Handlers.utils.reply("🎉 " .. name .. "@" .. version .. " published")(msg)
     ao.send({
         Target = msg.From,
         Action = "PublishResponse",
+        Result = "success",
         Data = "🎉 " .. vendor .. "/" .. name .. "@" .. version .. " published"
     })
 end
@@ -256,6 +284,22 @@ function Info(msg)
     local data = json.decode(msg.Data)
     local name = data.Name
     local version = data.Version or "latest"
+    local pkgID = data.PkgID
+
+    if pkgID then
+        local package = sql_run(string.format([[
+            SELECT * FROM Packages WHERE PkgID = "%s"
+        ]], pkgID))
+        assert(#package > 0, "❌ Package not found")
+        -- Handlers.utils.reply(json.encode(package[1]))(msg)
+        ao.send({
+            Target = msg.From,
+            Action = "InfoResponse",
+            Status = "success",
+            Data = json.encode(package[1])
+        })
+        return
+    end
 
     assert(name, "Package name is required")
     assert(isValidPackageName(name), "Invalid package name, only alphanumeric characters are allowed")
@@ -298,20 +342,25 @@ function GetAllPackages(msg)
     local packages = sql_run([[
         WITH UniqueNames AS (
     SELECT
-        Name,
-        MIN(Vendor) AS Vendor,
-        MAX(Version) AS Version,
-        MIN(Owner) AS Owner
+        MAX(Version) AS Version, *
     FROM
         Packages
     GROUP BY
         Name
+    ORDER BY
+        Installs DESC
+    LIMIT 50
 )
 SELECT
     Vendor,
     Name,
     Version,
-    Owner
+    Owner,
+    RepositoryUrl,
+    Description,
+    Installs,
+    Updated,
+    PkgID
 FROM
     UniqueNames;
     ]])
@@ -360,13 +409,19 @@ function Download(msg)
 
     assert(#res > 0, "❌ " .. vendor .. "/" .. name .. "@" .. version .. " not found")
 
+    --  increment installs
+    local inc_res = db:exec(string.format([[
+        UPDATE Packages SET Installs = Installs + 1 WHERE Name = "%s" AND Version = "%s" AND Vendor = "%s"
+    ]], name, res[1].Version, vendor))
+    print(inc_res)
+
 
     Assign({
         Processes = { msg.From },
         Message = res[1].PkgID
     })
 
-    print("ℹ️ Download request for " .. vendor .. "/" .. name .. "@" .. version .. " from " .. msg.From)
+    print("ℹ️ Download request for " .. vendor .. "/" .. name .. "@" .. res[1].Version .. " from " .. msg.From)
     -- ao.send({
     --     Target = msg.From,
     --     Action = "DownloadResponse",
@@ -432,9 +487,10 @@ function Search(msg)
 
     assert(type(query) == "string", "❌ Search query is required in Data")
 
+    -- match either name or vendor
     local packages = sql_run(string.format([[
-        SELECT DISTINCT Name, Vendor, Description FROM Packages WHERE Name LIKE "%%%s%%"
-    ]], query))
+        SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs FROM Packages WHERE Name LIKE "%%%s%%" OR Vendor LIKE "%%%s%%"
+    ]], query, query))
 
     -- Handlers.utils.reply(json.encode(packages))(msg)
     ao.send({
