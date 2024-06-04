@@ -12,6 +12,36 @@ The APM is a package manager for the AO the computer. It is designed to make it 
 
 APM ID `ZHUZLCewiKWFZPlq6cAHgES0XZyZgvUUVaKPLEcTsA8`
 
+<details>
+
+<summary> <strong>Guide</strong></summary>
+
+1. clone the ao-package-manager repo and cd into it - https://github.com/ankushKun/ao-package-manager
+2. spawn an sqlite process for the registry `AOS_MODULE=GYrbbe0VbHim_7Hi6zrOpHQXrSQz07XNtwCnfbFo2I0 aos apm`
+3. `.load apm.lua`
+4. try running `ListPackages()` it should say no packages
+get its process id
+---
+5. spawn a separate process (this will publish a package) `aos publisher`
+6. load the client tool `.load client-tool.lua` it should print APM client loaded
+7. set `APM.ID = id of the earlier process`
+8. use the [generate_package_data](https://github.com/ankushKun/ao-package-manager/blob/5fb309ff61bf68fd4940c95eed0ee92247097001/client-tool.lua#L31) function to pass the necessasary parameters and have it make a table that can be used to publish a package, it already sets some default sample code for testing. Store the result in a variable
+9. try running `APM.list()` to get a list of installed packages, should return empty/none
+10. run `APM.publish(package_data)` and wait for success message
+---
+11. run `ListPackages()` again in the registry process and check if the package is there.
+---
+12. spawn another process to test installation of package, repeat steps 5-7
+13. use `APM.list()` and check available packages
+14. Install the package you created earlier with `APM.install("package_name")`.
+If package was published under @apm vendor, it is optional to pass the vendor name during install
+15. Once installed try `pkg = require("package_name")` and perform package functions
+16. have a look at `APM.installed` table
+
+Here is a video that shows these steps: https://youtu.be/qZDtzOta4MM
+
+</details>
+
 ## Client Usage (For users wanting to install packages)
 
 ### Load client tool

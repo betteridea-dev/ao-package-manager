@@ -321,7 +321,7 @@ function APM.uninstall(name)
     end
 
     _G.package.loaded[name] = nil
-    table.remove(APM.installed, name)
+    APM.installed[name] = nil
 
     return "📦 Package has been uninstalled"
 end
