@@ -2,6 +2,8 @@
 
 The APM is a package manager for the AO the computer. It is designed to make it possible to easily install packages in processes.
 
+Visit [apm.betteridea.dev](https://apm.betteridea.dev) for a graphical interface to view and publish packages.
+
 <center>
 
 
