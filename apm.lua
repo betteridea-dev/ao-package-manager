@@ -130,6 +130,9 @@ function RegisterVendor(msg)
     assert(name, "❌ vendor name is required")
     assert(isValidVendor(name), "❌ Invalid vendor name, must be in the format @vendor")
     assert(name ~= "@apm", "❌ @apm can't be registered as vendor")
+    assert(name ~= "@registry", "❌ @registry can't be registered as vendor")
+    -- size 3 to 20
+    assert(#name > 3 and #name <= 20, "❌ Vendor name must be between 3 and 20 characters")
 
     for row in db:nrows(string.format([[
         SELECT * FROM Vendors WHERE Name = "%s"
@@ -147,6 +150,7 @@ function RegisterVendor(msg)
     ao.send({
         Target = msg.From,
         Action = "RegisterVendorResponse",
+        Result = "success",
         Data = "🎉 " .. name .. " registered"
     })
 end
@@ -291,6 +295,14 @@ function Info(msg)
             SELECT * FROM Packages WHERE PkgID = "%s"
         ]], pkgID))
         assert(#package > 0, "❌ Package not found")
+
+        -- all available versions and their pkg id
+        local versions = sql_run(string.format([[
+            SELECT Version, PkgID, Installs FROM Packages WHERE Name = "%s" AND Vendor = "%s"
+        ]], package[1].Name, package[1].Vendor))
+
+        package[1].Versions = versions
+
         -- Handlers.utils.reply(json.encode(package[1]))(msg)
         ao.send({
             Target = msg.From,
@@ -301,8 +313,22 @@ function Info(msg)
         return
     end
 
+    -- if name is @vendor/name
+    local vendor, pkg_name = name:match("^@(%w+)/(.+)$")
+    if vendor then
+        name = pkg_name
+        vendor = "@" .. vendor
+    else
+        vendor = "@apm"
+    end
+
+    -- print(vendor)
+    -- print(name)
+    -- print(version)
+
     assert(name, "Package name is required")
     assert(isValidPackageName(name), "Invalid package name, only alphanumeric characters are allowed")
+    assert(isValidVendor(vendor), "Invalid vendor name, must be in the format @vendor")
     if version ~= "latest" then
         assert(isValidVersion(version), "Invalid package version, must be in the format major.minor.patch")
     end
@@ -310,15 +336,22 @@ function Info(msg)
     local package
     if version == "latest" then
         package = sql_run(string.format([[
-            SELECT * FROM Packages WHERE Name = "%s" ORDER BY Version DESC LIMIT 1
-        ]], name))
+            SELECT * FROM Packages WHERE Name = "%s" AND Vendor = "%s" ORDER BY Version DESC LIMIT 1
+        ]], name, vendor))
     else
         package = sql_run(string.format([[
-            SELECT * FROM Packages WHERE Name = "%s" AND Version = "%s"
-        ]], name, version))
+            SELECT * FROM Packages WHERE Name = "%s" AND Vendor = "%s" AND Version = "%s"
+            ]], name,vendor, version))
     end
 
     assert(#package > 0, "❌ " .. name .. "@" .. version .. " not found")
+
+    -- all available versions and their pkg id
+    local versions = sql_run(string.format([[
+        SELECT Version, PkgID, Installs FROM Packages WHERE Name = "%s" AND Vendor = "%s"
+    ]], name, vendor))
+
+    package[1].Versions = versions
 
     -- Handlers.utils.reply(json.encode(package[1]))(msg)
     ao.send({
