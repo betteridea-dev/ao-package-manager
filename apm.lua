@@ -151,14 +151,14 @@ end
 ------------------------------------------------------
 
 function RegisterVendor(msg)
-    local cost = 10 * 10 ^ Denomination
+    local cost = utils.toBalanceValue(10 * 10 ^ Denomination)
     local data = json.decode(msg.Data)
     local name = data.Name
     local owner = msg.From
 
     assert(type(msg.Quantity) == 'string', 'Quantity is required!')
     assert(bint(msg.Quantity) <= bint(Balances[msg.From]), 'Quantity must be less than or equal to the current balance!')
-    assert(bint(msg.Quantity) == cost, "10 NEO must be burnt to registering a new vendor")
+    assert(msg.Quantity == cost, "10 NEO must be burnt to registering a new vendor")
 
 
     assert(name, "❌ vendor name is required")
@@ -180,12 +180,12 @@ function RegisterVendor(msg)
         INSERT INTO Vendors (Name, Owner) VALUES ("%s", '%s')
     ]], name, owner))
 
-    balances[msg.from] = utils.subtract(balances[msg.from], msg.quantity)
-    totalsupply = utils.subtract(totalsupply, msg.quantity)
+    Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
+    TotalSupply = utils.subtract(TotalSupply, msg.Quantity)
 
     ao.send({
         Target = msg.From,
-        Data = Colors.gray .. "Successfully burned " .. Colors.blue .. msg.Quantity .. Colors.reset
+        Data = "Successfully burned " .. msg.Quantity 
     })
 
     -- Handlers.utils.reply("🎉 " .. name .. " registered")(msg)
@@ -332,7 +332,7 @@ function Publish(msg)
 
     ao.send({
         Target = msg.From,
-        Data = Colors.gray .. "Successfully burned " .. Colors.blue .. msg.Quantity .. Colors.reset
+        Data = "Successfully burned " .. msg.Quantity
     })
 
     -- Handlers.utils.reply("🎉 " .. name .. "@" .. version .. " published")(msg)
