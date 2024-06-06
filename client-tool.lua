@@ -1,3 +1,5 @@
+local apm_id = "UdPDhw5S7pByV3pVqwyr1qzJ8mR8ktzi9olgsdsyZz4"
+
 json = require("json")
 base64 = require(".base64")
 
@@ -232,7 +234,7 @@ Handlers.add(
 
 APM = {}
 
-APM.ID = "wvWJYLcPcAgSZ4DM2xZaeSAhDKVrJmUNULP54LrTk3Q"
+APM.ID = apm_id
 APM.installed = {}
 
 function APM.registerVendor(name)

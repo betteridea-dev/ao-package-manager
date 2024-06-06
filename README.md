@@ -12,11 +12,23 @@ Visit [apm.betteridea.dev](https://apm.betteridea.dev) for a graphical interface
 
 </center>
 
-APM ID `ZHUZLCewiKWFZPlq6cAHgES0XZyZgvUUVaKPLEcTsA8`
+APM ID `UdPDhw5S7pByV3pVqwyr1qzJ8mR8ktzi9olgsdsyZz4`
+
+**UPDATE: Need to burn some tokens to publish/update packages or register a vendor. To reduce spam and setup a sustainable registry**\
+**load apm.lua then load the token blueprint to setup**
+
+**Costs:**
+- 10 tokens to register a vendor
+- 10 tokens to publish a package
+- 1 token to update a package
+
+Denomination of per token is kept at 10 so 1 whole token is 1 and then 10 zeroes `10000000000`\
+TotalSupply for `Test NEO` is set at 101M
 
 <details>
 
 <summary> <strong>Guide</strong></summary>
+
 
 1. clone the ao-package-manager repo and cd into it - https://github.com/ankushKun/ao-package-manager
 2. spawn an sqlite process for the registry `AOS_MODULE=GYrbbe0VbHim_7Hi6zrOpHQXrSQz07XNtwCnfbFo2I0 aos apm`
@@ -24,21 +36,21 @@ APM ID `ZHUZLCewiKWFZPlq6cAHgES0XZyZgvUUVaKPLEcTsA8`
 4. try running `ListPackages()` it should say no packages
 get its process id
 ---
-5. spawn a separate process (this will publish a package) `aos publisher`
-6. load the client tool `.load client-tool.lua` it should print APM client loaded
-7. set `APM.ID = id of the earlier process`
-8. use the [generate_package_data](https://github.com/ankushKun/ao-package-manager/blob/5fb309ff61bf68fd4940c95eed0ee92247097001/client-tool.lua#L31) function to pass the necessasary parameters and have it make a table that can be used to publish a package, it already sets some default sample code for testing. Store the result in a variable
-9. try running `APM.list()` to get a list of installed packages, should return empty/none
-10. run `APM.publish(package_data)` and wait for success message
+1. spawn a separate process (this will publish a package) `aos publisher`
+2. load the client tool `.load client-tool.lua` it should print APM client loaded
+3. set `APM.ID = id of the earlier process`
+4. use the [generate_package_data](https://github.com/ankushKun/ao-package-manager/blob/5fb309ff61bf68fd4940c95eed0ee92247097001/client-tool.lua#L31) function to pass the necessasary parameters and have it make a table that can be used to publish a package, it already sets some default sample code for testing. Store the result in a variable
+5. try running `APM.list()` to get a list of installed packages, should return empty/none
+6.  run `APM.publish(package_data)` and wait for success message
 ---
-11. run `ListPackages()` again in the registry process and check if the package is there.
+1.  run `ListPackages()` again in the registry process and check if the package is there.
 ---
-12. spawn another process to test installation of package, repeat steps 5-7
-13. use `APM.list()` and check available packages
-14. Install the package you created earlier with `APM.install("package_name")`.
+1.  spawn another process to test installation of package, repeat steps 5-7
+2.  use `APM.list()` and check available packages
+3.  Install the package you created earlier with `APM.install("package_name")`.
 If package was published under @apm vendor, it is optional to pass the vendor name during install
-15. Once installed try `pkg = require("package_name")` and perform package functions
-16. have a look at `APM.installed` table
+1.  Once installed try `pkg = require("package_name")` and perform package functions
+2.  have a look at `APM.installed` table
 
 Here is a video that shows these steps: https://youtu.be/qZDtzOta4MM
 

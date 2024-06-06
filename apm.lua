@@ -5,11 +5,26 @@ bint = require('.bint')(256)
 
 db = db or sqlite3.open_memory()
 
+local utils = {
+    add = function(a, b)
+        return tostring(bint(a) + bint(b))
+    end,
+    subtract = function(a, b)
+        return tostring(bint(a) - bint(b))
+    end,
+    toBalanceValue = function(a)
+        return tostring(bint(a))
+    end,
+    toNumber = function(a)
+        return tonumber(a)
+    end
+}
+
 ------------------------------------------------------ 101000000.0000000000
 -- Load the token blueprint after apm.lua
 Denomination = 10
-Balances = Balances or { [ao.id] = tostring(bint(101000000 * 10 ^ Denomination)) }
-TotalSupply = TotalSupply or tostring(bint(101000000 * 10 ^ Denomination))
+Balances = Balances or { [ao.id] = utils.toBalanceValue(101000000 * 10 ^ Denomination) }
+TotalSupply = TotalSupply or utils.toBalanceValue(101000000 * 10 ^ Denomination)
 Name = "Test NEO"
 Ticker = 'TNEO'
 Logo = 'zExoVE0178jbyUg2MP-cK6SbBRFiNDynB5FRqeD0yJc'
@@ -193,8 +208,8 @@ Handlers.add(
 ------------------------------------------------------
 
 function Publish(msg)
-    local cost_new = 10 * 10 ^ Denomination
-    local cost_update = 1 * 10 ^ Denomination
+    local cost_new = utils.toBalanceValue(10 * 10 ^ Denomination)
+    local cost_update = utils.toBalanceValue(1 * 10 ^ Denomination)
     local data = json.decode(msg.Data)
     local name = data.Name
     local version = data.Version
@@ -208,6 +223,7 @@ function Publish(msg)
     end
 
     assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+    assert(Balances[msg.From], "❌ You don't have any $NEO balance")
     assert(bint(msg.Quantity) <= bint(Balances[msg.From]), 'Quantity must be less than or equal to the current balance!')
     
     
@@ -235,13 +251,20 @@ function Publish(msg)
     -- if the package was published before, check the owner
     local existing = sql_run(string.format([[
         SELECT * FROM Packages WHERE Name = "%s" AND Vendor = "%s" ORDER BY Version DESC LIMIT 1
-    ]], name, version, vendor))
+    ]], name, vendor))
+
+    -- print(existing)
+
     if #existing > 0 then
         assert(existing[1].Owner == owner,
         "❌ You are not the owner of previously published " .. vendor .. "/" .. name .. "@" .. version)
-        assert(bint(msg.Quantity) == cost_update, "1 NEO must be burnt to update an existing package")
+        assert(msg.Quantity == cost_update,
+            "1 NEO must be burnt to update an existing package. You sent: " .. tostring(bint(msg.Quantity) / 10^Denomination))
     else
-        assert(bint(msg.Quantity) == cost_new, "10 NEO must be burnt to publish a new package")
+        assert(
+            msg.Quantity == cost_new,
+            "10 NEO must be burnt to publish a new package. You sent: " .. tostring(bint(msg.Quantity) / 10^Denomination)
+        )
     end
             
 
