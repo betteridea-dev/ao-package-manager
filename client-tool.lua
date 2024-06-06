@@ -129,7 +129,7 @@ end
 
 Handlers.add(
     "PublishAssignDownloadResponseHandler",
-    Handlers.utils.hasMatchingTag("Action", "Publish"),
+    Handlers.utils.hasMatchingTag("Action", "APM.Publish"),
     function(msg)
         print("Assignment ran")
         handle_run(PublishAssignDownloadResponseHandler, msg)
@@ -144,7 +144,7 @@ end
 
 Handlers.add(
     "RegisterVendorResponse",
-    Handlers.utils.hasMatchingTag("Action", "RegisterVendorResponse"),
+    Handlers.utils.hasMatchingTag("Action", "APM.RegisterVendorResponse"),
     function(msg)
         handle_run(RegisterVendorResponseHandler, msg)
     end
@@ -157,7 +157,7 @@ end
 
 Handlers.add(
     "PublishResponse",
-    Handlers.utils.hasMatchingTag("Action", "PublishResponse"),
+    Handlers.utils.hasMatchingTag("Action", "APM.PublishResponse"),
     function(msg)
         handle_run(PublishResponseHandler, msg)
     end
@@ -171,7 +171,7 @@ end
 
 Handlers.add(
     "InfoResponse",
-    Handlers.utils.hasMatchingTag("Action", "InfoResponse"),
+    Handlers.utils.hasMatchingTag("Action", "APM.InfoResponse"),
     function(msg)
         handle_run(InfoResponseHandler, msg)
     end
@@ -191,7 +191,7 @@ end
 
 Handlers.add(
     "SearchResponse",
-    Handlers.utils.hasMatchingTag("Action", "SearchResponse"),
+    Handlers.utils.hasMatchingTag("Action", "APM.SearchResponse"),
     function(msg)
         handle_run(SearchResponseHandler, msg)
     end
@@ -222,7 +222,7 @@ end
 
 Handlers.add(
     "GetAllPackagesResponse",
-    Handlers.utils.hasMatchingTag("Action", "GetAllPackagesResponse"),
+    Handlers.utils.hasMatchingTag("Action", "APM.GetAllPackagesResponse"),
     function(msg)
         handle_run(GetAllPackagesResponseHandler, msg)
     end
@@ -241,7 +241,7 @@ function APM.registerVendor(name)
     })
     Send({
         Target = APM.ID,
-        Action = "RegisterVendor",
+        Action = "APM.RegisterVendor",
         Data = data
     })
     return "📤 Vendor registration request sent"
@@ -252,7 +252,7 @@ function APM.publish(package_data)
     local data = json.encode(package_data)
     Send({
         Target = APM.ID,
-        Action = "Publish",
+        Action = "APM.Publish",
         Data = data
     })
     return "📤 Publish request sent"
@@ -261,7 +261,7 @@ end
 function APM.list()
     Send({
         Target = APM.ID,
-        Action = "GetAllPackages"
+        Action = "APM.GetAllPackages"
     })
     return "📤 Fetching all packages"
 end
@@ -271,7 +271,7 @@ function APM.search(query)
 
     Send({
         Target = APM.ID,
-        Action = "Search",
+        Action = "APM.Search",
         Data = query
     })
 
@@ -306,7 +306,7 @@ function APM.install(name, version)
 
     Send({
         Target = APM.ID,
-        Action = "Download",
+        Action = "APM.Download",
         Data = json.encode(data)
     })
 

@@ -1,7 +1,18 @@
 json = require("json")
 base64 = require(".base64")
 sqlite3 = require("lsqlite3")
+bint = require('.bint')(256)
+
 db = db or sqlite3.open_memory()
+
+------------------------------------------------------ 101000000.0000000000
+-- Load the token blueprint after apm.lua
+Denomination = 10
+Balances = Balances or { [ao.id] = tostring(bint(101000000 * 10 ^ Denomination)) }
+TotalSupply = TotalSupply or tostring(bint(101000000 * 10 ^ Denomination))
+Name = "Test NEO"
+Ticker = 'TNEO'
+Logo = 'zExoVE0178jbyUg2MP-cK6SbBRFiNDynB5FRqeD0yJc'
 
 ------------------------------------------------------
 
@@ -115,7 +126,9 @@ FROM
 
     for _, pkg in ipairs(p) do
         -- p_str = p_str .. pkg.Vendor .. "/" .. pkg.Name .. "@" .. pkg.Version .. " - " .. pkg.Owner .. "\n"
-        p_str = p_str .. pkg.Vendor .. "/" .. pkg.Name .. "@" .. pkg.Version .. " - " .. pkg.Owner .. " - " .. pkg.RepositoryUrl or "no url" .. " - " .. pkg.Description .. " - " .. pkg.Installs .. " installs\n"
+        p_str = p_str ..
+            pkg.Vendor .. "/" .. pkg.Name .. "@" .. pkg.Version .. " - " .. pkg.Owner .. " - " .. pkg.RepositoryUrl or
+            "no url" .. " - " .. pkg.Description .. " - " .. pkg.Installs .. " installs\n"
     end
     return p_str
 end
@@ -123,9 +136,15 @@ end
 ------------------------------------------------------
 
 function RegisterVendor(msg)
+    local cost = 10 * 10 ^ Denomination
     local data = json.decode(msg.Data)
     local name = data.Name
     local owner = msg.From
+
+    assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+    assert(bint(msg.Quantity) <= bint(Balances[msg.From]), 'Quantity must be less than or equal to the current balance!')
+    assert(bint(msg.Quantity) == cost, "10 NEO must be burnt to registering a new vendor")
+
 
     assert(name, "❌ vendor name is required")
     assert(isValidVendor(name), "❌ Invalid vendor name, must be in the format @vendor")
@@ -146,10 +165,18 @@ function RegisterVendor(msg)
         INSERT INTO Vendors (Name, Owner) VALUES ("%s", '%s')
     ]], name, owner))
 
+    balances[msg.from] = utils.subtract(balances[msg.from], msg.quantity)
+    totalsupply = utils.subtract(totalsupply, msg.quantity)
+
+    ao.send({
+        Target = msg.From,
+        Data = Colors.gray .. "Successfully burned " .. Colors.blue .. msg.Quantity .. Colors.reset
+    })
+
     -- Handlers.utils.reply("🎉 " .. name .. " registered")(msg)
     ao.send({
         Target = msg.From,
-        Action = "RegisterVendorResponse",
+        Action = "APM.RegisterVendorResponse",
         Result = "success",
         Data = "🎉 " .. name .. " registered"
     })
@@ -157,7 +184,7 @@ end
 
 Handlers.add(
     "RegisterVendor",
-    Handlers.utils.hasMatchingTag("Action", "RegisterVendor"),
+    Handlers.utils.hasMatchingTag("Action", "APM.RegisterVendor"),
     function(msg)
         handle_run(RegisterVendor, msg)
     end
@@ -166,6 +193,8 @@ Handlers.add(
 ------------------------------------------------------
 
 function Publish(msg)
+    local cost_new = 10 * 10 ^ Denomination
+    local cost_update = 1 * 10 ^ Denomination
     local data = json.decode(msg.Data)
     local name = data.Name
     local version = data.Version
@@ -178,11 +207,15 @@ function Publish(msg)
         error("❌ Registry cannot publish packages to itself")
     end
 
+    assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+    assert(bint(msg.Quantity) <= bint(Balances[msg.From]), 'Quantity must be less than or equal to the current balance!')
+    
+    
     assert(type(name) == "string", "❌ Package name is required")
     assert(type(version) == "string", "❌ Package version is required")
     assert(type(vendor) == "string", "❌ vendor is required")
     assert(type(package_data) == "table", "❌ PackageData is required")
-
+    
     assert(isValidPackageName(name), "Invalid package name, only alphanumeric characters are allowed")
     assert(isValidVersion(version), "Invalid package version, must be in the format major.minor.patch")
     assert(isValidVendor(vendor), "Invalid vendor name, must be in the format @vendor")
@@ -194,9 +227,10 @@ function Publish(msg)
     assert(type(package_data.Authors) == "table", "❌ Authors(table) is required in PackageData")
     assert(type(package_data.Dependencies) == "table", "❌ Dependencies(table) is required in PackageData")
     assert(type(package_data.Main) == "string", "❌ Main(string) is required in PackageData")
-
+    
+    
     package_data.Readme = hexencode(package_data.Readme)
-
+    
     -- print(vendor)
     -- if the package was published before, check the owner
     local existing = sql_run(string.format([[
@@ -204,8 +238,12 @@ function Publish(msg)
     ]], name, version, vendor))
     if #existing > 0 then
         assert(existing[1].Owner == owner,
-            "❌ You are not the owner of previously published " .. vendor .. "/" .. name .. "@" .. version)
+        "❌ You are not the owner of previously published " .. vendor .. "/" .. name .. "@" .. version)
+        assert(bint(msg.Quantity) == cost_update, "1 NEO must be burnt to update an existing package")
+    else
+        assert(bint(msg.Quantity) == cost_new, "10 NEO must be burnt to publish a new package")
     end
+            
 
     -- check validity of Items
     for _, item in ipairs(package_data.Items) do
@@ -265,10 +303,19 @@ function Publish(msg)
     assert(db_res == 0, "❌[insert error] " .. db:errmsg())
 
     print("ℹ️ new package: " .. vendor .. "/" .. name .. "@" .. version .. " by " .. owner)
+
+    Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
+    TotalSupply = utils.subtract(TotalSupply, msg.Quantity)
+
+    ao.send({
+        Target = msg.From,
+        Data = Colors.gray .. "Successfully burned " .. Colors.blue .. msg.Quantity .. Colors.reset
+    })
+
     -- Handlers.utils.reply("🎉 " .. name .. "@" .. version .. " published")(msg)
     ao.send({
         Target = msg.From,
-        Action = "PublishResponse",
+        Action = "APM.PublishResponse",
         Result = "success",
         Data = "🎉 " .. vendor .. "/" .. name .. "@" .. version .. " published"
     })
@@ -276,7 +323,7 @@ end
 
 Handlers.add(
     "Publish",
-    Handlers.utils.hasMatchingTag("Action", "Publish"),
+    Handlers.utils.hasMatchingTag("Action", "APM.Publish"),
     function(msg)
         handle_run(Publish, msg)
     end
@@ -306,7 +353,7 @@ function Info(msg)
         -- Handlers.utils.reply(json.encode(package[1]))(msg)
         ao.send({
             Target = msg.From,
-            Action = "InfoResponse",
+            Action = "APM.InfoResponse",
             Status = "success",
             Data = json.encode(package[1])
         })
@@ -341,7 +388,7 @@ function Info(msg)
     else
         package = sql_run(string.format([[
             SELECT * FROM Packages WHERE Name = "%s" AND Vendor = "%s" AND Version = "%s"
-            ]], name,vendor, version))
+            ]], name, vendor, version))
     end
 
     assert(#package > 0, "❌ " .. name .. "@" .. version .. " not found")
@@ -356,14 +403,14 @@ function Info(msg)
     -- Handlers.utils.reply(json.encode(package[1]))(msg)
     ao.send({
         Target = msg.From,
-        Action = "InfoResponse",
+        Action = "APM.InfoResponse",
         Data = json.encode(package[1])
     })
 end
 
 Handlers.add(
     "Info",
-    Handlers.utils.hasMatchingTag("Action", "Info"),
+    Handlers.utils.hasMatchingTag("Action", "APM.Info"),
     function(msg)
         handle_run(Info, msg)
     end
@@ -401,14 +448,14 @@ FROM
     -- Handlers.utils.reply(json.encode(packages))(msg)
     ao.send({
         Target = msg.From,
-        Action = "GetAllPackagesResponse",
+        Action = "APM.GetAllPackagesResponse",
         Data = json.encode(packages)
     })
 end
 
 Handlers.add(
     "GetAllPackages",
-    Handlers.utils.hasMatchingTag("Action", "GetAllPackages"),
+    Handlers.utils.hasMatchingTag("Action", "APM.GetAllPackages"),
     function(msg)
         handle_run(GetAllPackages, msg)
     end
@@ -457,14 +504,14 @@ function Download(msg)
     print("ℹ️ Download request for " .. vendor .. "/" .. name .. "@" .. res[1].Version .. " from " .. msg.From)
     -- ao.send({
     --     Target = msg.From,
-    --     Action = "DownloadResponse",
+    --     Action = "APM.DownloadResponse",
     --     Data = json.encode(res[1])
     -- })
 end
 
 Handlers.add(
     "Download",
-    Handlers.utils.hasMatchingTag("Action", "Download"),
+    Handlers.utils.hasMatchingTag("Action", "APM.Download"),
     function(msg)
         handle_run(Download, msg)
     end
@@ -499,14 +546,14 @@ function Transfer(msg)
     -- Handlers.utils.reply("🎉 " .. vendor .. "/" .. name .. " transferred to " .. new_owner)(msg)
     ao.send({
         Target = msg.From,
-        Action = "TransferResponse",
+        Action = "APM.TransferResponse",
         Data = "🎉 " .. vendor .. "/" .. name .. " transferred to " .. new_owner
     })
 end
 
 Handlers.add(
     "Transfer",
-    Handlers.utils.hasMatchingTag("Action", "Transfer"),
+    Handlers.utils.hasMatchingTag("Action", "APM.Transfer"),
     function(msg)
         handle_run(Transfer, msg)
     end
@@ -528,14 +575,14 @@ function Search(msg)
     -- Handlers.utils.reply(json.encode(packages))(msg)
     ao.send({
         Target = msg.From,
-        Action = "SearchResponse",
+        Action = "APM.SearchResponse",
         Data = json.encode(packages)
     })
 end
 
 Handlers.add(
     "Search",
-    Handlers.utils.hasMatchingTag("Action", "Search"),
+    Handlers.utils.hasMatchingTag("Action", "APM.Search"),
     function(msg)
         handle_run(Search, msg)
     end
