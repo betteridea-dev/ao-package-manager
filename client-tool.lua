@@ -256,6 +256,20 @@ Handlers.add(
 
 ----------------------------------------
 
+function TransferResponseHandler(msg)
+    print(msg.Data)
+end
+
+Handlers.add(
+    "APM.TransferResponse",
+    Handlers.utils.hasMatchingTag("Action", "APM.TransferResponse"),
+    function(msg)
+        handle_run(TransferResponseHandler, msg)
+    end
+)
+
+----------------------------------------
+
 APM = {}
 
 APM.ID = apm_id
@@ -317,6 +331,19 @@ function APM.search(query)
     })
 
     return "📤 Searching for packages"
+end
+
+function APM.transfer(name, recipient)
+    assert(type(name) == "string", "Name must be a string")
+    assert(type(recipient) == "string", "Recipient must be a string")
+
+    Send({
+        Target = APM.ID,
+        Action = "APM.Transfer",
+        Data = name,
+        To = recipient
+    })
+    return "📤 Transfer request sent"
 end
 
 function APM.install(name)

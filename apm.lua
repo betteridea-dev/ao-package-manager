@@ -394,7 +394,7 @@ function Info(msg)
 
     local vendor, pkg_name, version = split_package_name(name)
 
-    local is_package_id = #name == 43 and pkg_name == nil
+    local is_package_id = #name == 43
 
     -- if pkgID is sent in data, ignore everything else and get package info
     if is_package_id then
@@ -406,6 +406,8 @@ function Info(msg)
             package[1].Name, package[1].Vendor)
         package[1].Versions = versions
 
+        print("APM>>> info request for " .. package[1].Vendor .. "/" .. package[1].Name .. "@" .. package[1].Version ..
+            " by " .. msg.From)
         ao.send({
             Target = msg.From,
             Action = "APM.InfoResponse",
