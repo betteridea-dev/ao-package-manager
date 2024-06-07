@@ -579,6 +579,7 @@ function Transfer(msg)
     ao.send({
         Target = msg.From,
         Action = "APM.TransferResponse",
+        Result = "success",
         Data = "🎉 " .. vendor .. "/" .. name .. " transferred to " .. new_owner
     })
 end
