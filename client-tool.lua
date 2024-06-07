@@ -286,7 +286,8 @@ function APM.install(name, version)
         assert(type(version) == "string", "Version must be a string")
     end
 
-    local vendor, package = name:match("@(%w+)/(%w+)")
+    -- local vendor, package = name:match("@(%w+)/(%w+)")
+    local vendor, package = name:match("@(%w+)/([%w%-%_]+)")
 
     if vendor then
         vendor = "@" .. vendor

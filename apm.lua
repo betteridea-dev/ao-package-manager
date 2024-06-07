@@ -487,10 +487,13 @@ Handlers.add(
 ------------------------------------------------------
 
 function Download(msg)
+    print(msg.Data)
     local data = json.decode(msg.Data)
     local name = data.Name
     local version = data.Version or "latest"
     local vendor = data.Vendor or "@apm"
+
+    print(name)
 
     -- Prevent installation on registry process coz assignments have the Tag Action:Publish, which could cause a race condition?
     if msg.From == ao.id then
