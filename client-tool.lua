@@ -19,6 +19,34 @@ function handle_run(func, msg)
     end
 end
 
+function split_package_name(query)
+    local vendor, pkgname, version
+
+    -- if only vendor is given
+    if query:find("^@%w+$") then
+        return query, nil, nil
+    end
+
+    -- check if version is provided
+    local version_index = query:find("@%d+.%d+.%d+$")
+    if version_index then
+        version = query:sub(version_index + 1)
+        query = query:sub(1, version_index - 1)
+    end
+
+    -- check if vendor is provided
+    vendor, pkgname = query:match("@(%w+)/([%w%-%_]+)")
+
+    if not vendor then
+        vendor = "@apm"
+        pkgname = query
+    else
+        vendor = "@" .. vendor
+    end
+
+    return vendor, pkgname, version
+end
+
 -- function to generate package data
 -- @param name: Name of the package
 -- @param Vendor: Vender under which package is published (leave nil for default @apm)
@@ -30,8 +58,7 @@ end
 -- @param repo_url: URL of the repository
 -- @param items: List of files in the package
 -- @param authors: List of authors
-function generate_package_data(name, Vendor, version, readme, description, main, dependencies, repo_url, items,
-                               authors)
+function generate_package_data(name, Vendor, version, readme, description, main, dependencies, repo_url, items,authors)
     assert(type(name) == "string", "Name must be a string")
     assert(type(Vendor) == "string" or Vendor == nil, "Vendor must be a string or nil")
     assert(type(version) == "string" or version == nil, "Version must be a string or nil")
@@ -85,9 +112,7 @@ end
 -- variant of the download response handler that supports assign()
 
 function PublishAssignDownloadResponseHandler(msg)
-    -- print(msg)
     local data = json.decode(msg.Data)
-    print(data)
     local vendor = data.Vendor
     local version = data.Version
     local PkgData = data.PackageData
@@ -130,10 +155,9 @@ function PublishAssignDownloadResponseHandler(msg)
 end
 
 Handlers.add(
-    "PublishAssignDownloadResponseHandler",
+    "APM.PublishAssignDownloadResponseHandler",
     Handlers.utils.hasMatchingTag("Action", "APM.Publish"),
     function(msg)
-        print("Assignment ran")
         handle_run(PublishAssignDownloadResponseHandler, msg)
     end
 )
@@ -145,7 +169,7 @@ function RegisterVendorResponseHandler(msg)
 end
 
 Handlers.add(
-    "RegisterVendorResponse",
+    "APM.RegisterVendorResponse",
     Handlers.utils.hasMatchingTag("Action", "APM.RegisterVendorResponse"),
     function(msg)
         handle_run(RegisterVendorResponseHandler, msg)
@@ -158,7 +182,7 @@ function PublishResponseHandler(msg)
 end
 
 Handlers.add(
-    "PublishResponse",
+    "APM.PublishResponse",
     Handlers.utils.hasMatchingTag("Action", "APM.PublishResponse"),
     function(msg)
         handle_run(PublishResponseHandler, msg)
@@ -172,7 +196,7 @@ function InfoResponseHandler(msg)
 end
 
 Handlers.add(
-    "InfoResponse",
+    "APM.InfoResponse",
     Handlers.utils.hasMatchingTag("Action", "APM.InfoResponse"),
     function(msg)
         handle_run(InfoResponseHandler, msg)
@@ -192,7 +216,7 @@ function SearchResponseHandler(msg)
 end
 
 Handlers.add(
-    "SearchResponse",
+    "APM.SearchResponse",
     Handlers.utils.hasMatchingTag("Action", "APM.SearchResponse"),
     function(msg)
         handle_run(SearchResponseHandler, msg)
@@ -201,7 +225,7 @@ Handlers.add(
 
 ----------------------------------------
 
-function GetAllPackagesResponseHandler(msg)
+function GetPopularResponseHandler(msg)
     local data = json.decode(msg.Data)
 
     local p = "\n"
@@ -223,10 +247,10 @@ function GetAllPackagesResponseHandler(msg)
 end
 
 Handlers.add(
-    "GetAllPackagesResponse",
-    Handlers.utils.hasMatchingTag("Action", "APM.GetAllPackagesResponse"),
+    "APM.GetPopularResponse",
+    Handlers.utils.hasMatchingTag("Action", "APM.GetPopularResponse"),
     function(msg)
-        handle_run(GetAllPackagesResponseHandler, msg)
+        handle_run(GetPopularResponseHandler, msg)
     end
 )
 
@@ -238,34 +262,49 @@ APM.ID = apm_id
 APM.installed = {}
 
 function APM.registerVendor(name)
-    local data = json.encode({
-        Name = name
-    })
     Send({
         Target = APM.ID,
         Action = "APM.RegisterVendor",
-        Data = data
+        Data = name,
+        Quantity = '100000000000'
     })
     return "📤 Vendor registration request sent"
 end
 
-function APM.publish(package_data)
+-- to publish an update set options = { Update = true }
+function APM.publish(package_data, options)
     assert(type(package_data) == "table", "Package data must be a table")
     local data = json.encode(package_data)
+    local quantity
+    if options and options.Update == true then
+        quantity = '10000000000'
+    else
+        quantity = '100000000000'
+    end
     Send({
         Target = APM.ID,
         Action = "APM.Publish",
-        Data = data
+        Data = data,
+        Quantity = quantity
     })
     return "📤 Publish request sent"
 end
 
-function APM.list()
+function APM.info(name)
     Send({
         Target = APM.ID,
-        Action = "APM.GetAllPackages"
+        Action = "APM.Info",
+        Data = name
     })
-    return "📤 Fetching all packages"
+    return "📤 Fetching package info"
+end
+
+function APM.popular()
+    Send({
+        Target = APM.ID,
+        Action = "APM.GetPopular"
+    })
+    return "📤 Fetching top 50 downloaded packages"
 end
 
 function APM.search(query)
@@ -280,39 +319,20 @@ function APM.search(query)
     return "📤 Searching for packages"
 end
 
-function APM.install(name, version)
+function APM.install(name)
     assert(type(name) == "string", "Name must be a string")
-    if version then
-        assert(type(version) == "string", "Version must be a string")
-    end
 
-    -- local vendor, package = name:match("@(%w+)/(%w+)")
-    local vendor, package = name:match("@(%w+)/([%w%-%_]+)")
-
-    if vendor then
-        vendor = "@" .. vendor
-        name = package
-    else
-        vendor = "@apm"
-    end
-
-    if not version then
-        version = "latest"
-    end
-
-
-    local data = {
-        Vendor = vendor,
-        Name = name,
-        Version = version
-    }
+    -- name cam be in the following formats: 
+    -- @vendor/pkgname@x.y.z
+    -- pkgname@x.y.z
+    -- pkgname
+    -- @vendor/pkgname
 
     Send({
         Target = APM.ID,
         Action = "APM.Download",
-        Data = json.encode(data)
+        Data = name
     })
-
     return "📤 Download request sent"
 end
 
