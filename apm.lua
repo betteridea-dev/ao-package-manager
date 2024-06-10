@@ -203,6 +203,35 @@ FROM
     return p_str
 end
 
+-- Function to get latest apm client version
+function GetLatestClientVersion()
+    local version = sql_run(
+        [[SELECT Version FROM Packages WHERE Name = "apm" AND Vendor = "@apm" ORDER BY Version DESC LIMIT 1]])
+    if #version == 0 then
+        return nil
+    end
+    return version[1].Version
+end
+
+-- Checker function to be added in every action to check for updates
+function CheckForAvailableUpdate(msg)
+    local client_version = msg.Version
+    local latest_version
+    if client_version then
+        latest_version = GetLatestClientVersion()
+    end
+    if client_version and latest_version and client_version ~= latest_version then
+        ao.send({
+            Target = msg.From,
+            Action = "APM.UpdateNotice",
+            Data = string.format(
+                Colors.red ..
+                "📦 An APM client update %s -> %s is available. It is recommended to run APM.update()" .. Colors.reset,
+                client_version, latest_version)
+        })
+    end
+end
+
 ------------------------------------------------------
 
 function RegisterVendor(msg)
@@ -246,6 +275,7 @@ function RegisterVendor(msg)
         Result = "success",
         Data = "🎉 " .. name .. " registered"
     })
+    CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
@@ -377,6 +407,7 @@ function Publish(msg)
         Result = "success",
         Data = "🎉 " .. vendor .. "/" .. name .. "@" .. version .. " published"
     })
+    CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
@@ -414,6 +445,7 @@ function Info(msg)
             Status = "success",
             Data = json.encode(package[1])
         })
+        CheckForAvailableUpdate(msg)
         return
     end
 
@@ -450,6 +482,7 @@ function Info(msg)
         Action = "APM.InfoResponse",
         Data = json.encode(package[1])
     })
+    CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
@@ -495,6 +528,7 @@ FROM
         Action = "APM.GetPopularResponse",
         Data = json.encode(packages)
     })
+    CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
@@ -540,7 +574,7 @@ function Download(msg)
         Processes = { msg.From },
         Message = res[1].PkgID
     })
-
+    CheckForAvailableUpdate(msg)
     print("APM>>> download request for " .. vendor .. "/" .. name .. "@" .. res[1].Version .. " from " .. msg.From)
 end
 
@@ -582,6 +616,7 @@ function Transfer(msg)
         Result = "success",
         Data = "🎉 " .. vendor .. "/" .. name .. " transferred to " .. new_owner
     })
+    CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
@@ -615,12 +650,13 @@ function Search(msg)
     end
 
     print("APM>>> searched " ..
-    ((vendor or "---") .. "/" .. (pkgname or "---")) .. " by " .. msg.From .. " found " .. #packages .. " packages")
+        ((vendor or "---") .. "/" .. (pkgname or "---")) .. " by " .. msg.From .. " found " .. #packages .. " packages")
     ao.send({
         Target = msg.From,
         Action = "APM.SearchResponse",
         Data = json.encode(packages)
     })
+    CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
@@ -628,6 +664,32 @@ Handlers.add(
     Handlers.utils.hasMatchingTag("Action", "APM.Search"),
     function(msg)
         handle_run(Search, msg)
+    end
+)
+
+------------------------------------------------------
+
+function UpdateClient(msg)
+    local l = sql_run([[SELECT * FROM Packages WHERE Name = "apm" AND Vendor = "@apm" ORDER BY Version DESC LIMIT 1]])
+    if #l > 0 then
+        ao.send({
+            Target = msg.From,
+            Action = "APM.UpdateClientResponse",
+            Data = json.encode(l[1])
+        })
+    else
+        ao.send({
+            Target = msg.From,
+            Data = "No updates available"
+        })
+    end
+end
+
+Handlers.add(
+    "APM.UpdateClient",
+    Handlers.utils.hasMatchingTag("Action", "APM.UpdateClient"),
+    function(msg)
+        handle_run(UpdateClient, msg)
     end
 )
 
