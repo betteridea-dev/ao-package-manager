@@ -9,10 +9,11 @@
 --
 ---------------------------------------------------------------------------
 -- APM Registry source code: https://github.com/ankushKun/ao-package-manager
--- Web UI for publishing packages: https://apm.betteridea.dev
+-- Web UI for browsing & publishing packages: https://apm.betteridea.dev
 -- Built with ❤️ by BetterIDEa
 
 local apm_id = "UdPDhw5S7pByV3pVqwyr1qzJ8mR8ktzi9olgsdsyZz4"
+local version = "1.0.2"
 
 json = require("json")
 base64 = require(".base64")
@@ -347,8 +348,8 @@ Handlers.add(
 APM = {}
 
 APM.ID = apm_id
-APM._version = APM._version or "1.0.0"
-APM.installed = {}
+APM._version = APM._version or version
+APM.installed = APM.installed or {}
 
 function APM.registerVendor(name)
     Send({

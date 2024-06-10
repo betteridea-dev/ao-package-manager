@@ -216,11 +216,8 @@ end
 -- Checker function to be added in every action to check for updates
 function CheckForAvailableUpdate(msg)
     local client_version = msg.Version
-    local latest_version
-    if client_version then
-        latest_version = GetLatestClientVersion()
-    end
-    if client_version and latest_version and client_version ~= latest_version then
+    local latest_version = GetLatestClientVersion()
+    if latest_version and client_version ~= latest_version then
         ao.send({
             Target = msg.From,
             Action = "APM.UpdateNotice",
@@ -672,6 +669,10 @@ Handlers.add(
 function UpdateClient(msg)
     local l = sql_run([[SELECT * FROM Packages WHERE Name = "apm" AND Vendor = "@apm" ORDER BY Version DESC LIMIT 1]])
     if #l > 0 then
+        -- increment
+        local inc_res = sql_write([[UPDATE Packages SET Installs = Installs + 1 WHERE Name = "apm" AND Vendor = "@apm" AND Version = ?]], l[1].Version)
+        assert(inc_res == 1, "❌[update error] " .. db:errmsg())
+
         ao.send({
             Target = msg.From,
             Action = "APM.UpdateClientResponse",
@@ -683,6 +684,7 @@ function UpdateClient(msg)
             Data = "No updates available"
         })
     end
+    print("APM>>> update client request by " .. msg.From)
 end
 
 Handlers.add(
