@@ -25,9 +25,9 @@ local utils = {
 Denomination = 10
 Balances = Balances or { [ao.id] = utils.toBalanceValue(101000000 * 10 ^ Denomination) }
 TotalSupply = TotalSupply or utils.toBalanceValue(101000000 * 10 ^ Denomination)
-Name = "Test NEO"
-Ticker = 'TNEO'
-Logo = 'zExoVE0178jbyUg2MP-cK6SbBRFiNDynB5FRqeD0yJc'
+Name = "NEO"
+Ticker = 'NEO'
+Logo = 'psy1gR3VgZ-53u0RElEd-zNEeBDMdhqpCU6U5OxQXTk'
 
 ------------------------------------------------------
 
@@ -421,8 +421,11 @@ function Info(msg)
     local name = msg.Data
 
     local vendor, pkg_name, version = split_package_name(name)
+    print(vendor)
+    print(pkg_name)
+    print(version)
 
-    local is_package_id = #name == 43
+    local is_package_id = (#name == 43)
 
     -- if pkgID is sent in data, ignore everything else and get package info
     if is_package_id then
@@ -445,6 +448,9 @@ function Info(msg)
         CheckForAvailableUpdate(msg)
         return
     end
+
+    if not vendor then vendor = "@apm" end
+    if not version then version = "latest" end
 
 
     assert(pkg_name, "Package name is required")
@@ -507,6 +513,7 @@ function GetPopular(msg)
     LIMIT 50
 )
 SELECT
+    -- README,
     Vendor,
     Name,
     Version,
@@ -638,11 +645,11 @@ function Search(msg)
     local packages
     if not vendor then
         packages = sql_run(
-            [[SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs FROM Packages WHERE Name LIKE ?]],
+            [[SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, README FROM Packages WHERE Name LIKE ?]],
             "%" .. (pkgname or "") .. "%")
     else
         packages = sql_run(
-            [[SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs FROM Packages WHERE Name LIKE ? AND Vendor LIKE ?]],
+            [[SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, README FROM Packages WHERE Name LIKE ? AND Vendor LIKE ?]],
             "%" .. (pkgname or "") .. "%", "%" .. vendor .. "%")
     end
 
