@@ -27,7 +27,7 @@ Balances = Balances or { [ao.id] = utils.toBalanceValue(101000000 * 10 ^ Denomin
 TotalSupply = TotalSupply or utils.toBalanceValue(101000000 * 10 ^ Denomination)
 Name = "NEO"
 Ticker = 'NEO'
-Logo = 'psy1gR3VgZ-53u0RElEd-zNEeBDMdhqpCU6U5OxQXTk'
+Logo = '3rLkpIednEz1kU9h7YplYhEz2bcKvvjd6LBby52cIKo'
 
 ------------------------------------------------------
 
