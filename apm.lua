@@ -236,6 +236,7 @@ function RegisterVendor(msg)
     local name = msg.Data
     local owner = msg.From
 
+
     assert(type(msg.Quantity) == 'string', 'Quantity is required!')
     assert(bint(msg.Quantity) <= bint(Balances[msg.From]), 'Quantity must be less than or equal to the current balance!')
     assert(msg.Quantity == cost, "10 NEO must be burnt to registering a new vendor")
@@ -248,9 +249,11 @@ function RegisterVendor(msg)
     -- size 3 to 20
     assert(#name > 3 and #name <= 20, "❌ Vendor name must be between 3 and 20 characters")
 
+    print(name .. " " .. owner .. " " .. msg.From .. " " .. msg.Quantity .. " " .. cost)
     -- check if vendor already exists
-    for row in sql_run([[SELECT * FROM Vendors WHERE Name = ?]], name) do
-        assert(nil, "❌ " .. name .. " already exists")
+    local row = sql_run([[SELECT * FROM Vendors WHERE Name = ?]], name)
+    if #row > 0 then
+        error("❌ " .. name .. " already exists")
     end
 
     -- save vendor details
@@ -677,7 +680,9 @@ function UpdateClient(msg)
     local l = sql_run([[SELECT * FROM Packages WHERE Name = "apm" AND Vendor = "@apm" ORDER BY Version DESC LIMIT 1]])
     if #l > 0 then
         -- increment
-        local inc_res = sql_write([[UPDATE Packages SET Installs = Installs + 1 WHERE Name = "apm" AND Vendor = "@apm" AND Version = ?]], l[1].Version)
+        local inc_res = sql_write(
+        [[UPDATE Packages SET Installs = Installs + 1 WHERE Name = "apm" AND Vendor = "@apm" AND Version = ?]],
+            l[1].Version)
         assert(inc_res == 1, "❌[update error] " .. db:errmsg())
 
         ao.send({
