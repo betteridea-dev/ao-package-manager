@@ -510,7 +510,7 @@ function GetPopular(msg)
     FROM
         Packages
     GROUP BY
-        Name
+        Name, Vendor
     ORDER BY
         Installs DESC
     LIMIT 50
