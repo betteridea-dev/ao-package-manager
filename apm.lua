@@ -648,11 +648,35 @@ function Search(msg)
     local packages
     if not vendor then
         packages = sql_run(
-            [[SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, RepositoryUrl FROM Packages WHERE Name LIKE ?]],
+            [[
+        WITH UniqueNames AS (
+    SELECT
+        MAX(Version) AS Version, *
+    FROM
+        Packages
+    GROUP BY
+        Name, Vendor
+    ORDER BY
+        Installs DESC
+)       
+        SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, RepositoryUrl FROM UniqueNames WHERE Name LIKE ?
+            ]],
             "%" .. (pkgname or "") .. "%")
     else
         packages = sql_run(
-            [[SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, RepositoryUrl FROM Packages WHERE Name LIKE ? AND Vendor LIKE ?]],
+            [[
+        WITH UniqueNames AS (
+    SELECT
+        MAX(Version) AS Version, *
+    FROM
+        Packages
+    GROUP BY
+        Name, Vendor
+    ORDER BY
+        Installs DESC
+)
+        SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, RepositoryUrl FROM UniqueNames WHERE Name LIKE ? AND Vendor LIKE ?
+            ]],
             "%" .. (pkgname or "") .. "%", "%" .. vendor .. "%")
     end
 
