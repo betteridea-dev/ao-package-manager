@@ -577,15 +577,9 @@ function Download(msg)
         vendor)
     assert(inc_res == 1, "❌[update error] " .. db:errmsg())
 
-    -- Assign({
-    --     Processes = { msg.From },
-    --     Message = res[1].PkgID
-    -- })
-    ao.send({
-        Target = msg.From,
-        Data = res[1].PkgID,
-        AssignableName = res[1].Vendor .. "/" .. res[1].Name .. "@" .. res[1].Version,
-        Action = "APM.DownloadResponse"
+    Assign({
+        Processes = { msg.From },
+        Message = res[1].PkgID
     })
     CheckForAvailableUpdate(msg)
     print("APM>>> download request for " .. vendor .. "/" .. name .. "@" .. res[1].Version .. " from " .. msg.From)
@@ -664,7 +658,7 @@ function Search(msg)
         Name, Vendor
     ORDER BY
         Installs DESC
-)
+)       
         SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, RepositoryUrl FROM UniqueNames WHERE Name LIKE ?
             ]],
             "%" .. (pkgname or "") .. "%")
@@ -711,7 +705,7 @@ function UpdateClient(msg)
     if #l > 0 then
         -- increment
         local inc_res = sql_write(
-            [[UPDATE Packages SET Installs = Installs + 1 WHERE Name = "apm" AND Vendor = "@apm" AND Version = ?]],
+        [[UPDATE Packages SET Installs = Installs + 1 WHERE Name = "apm" AND Vendor = "@apm" AND Version = ?]],
             l[1].Version)
         assert(inc_res == 1, "❌[update error] " .. db:errmsg())
 
