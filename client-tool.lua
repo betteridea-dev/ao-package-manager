@@ -12,8 +12,8 @@
 -- Web UI for browsing & publishing packages: https://apm.betteridea.dev
 -- Built with ❤️ by BetterIDEa Team
 
-local apm_id = "s5DRC_Vs5mz5ho4l-9FW6zQOxlTbCIwKlyI4JYGQPJc"
-local version = "1.0.2"
+local apm_id = "UdPDhw5S7pByV3pVqwyr1qzJ8mR8ktzi9olgsdsyZz4"
+local version = "1.1.0"
 
 json = require("json")
 base64 = require(".base64")
