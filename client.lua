@@ -88,6 +88,16 @@ function HandleRun(func, msg)
     end
 end
 
+function CheckUpdate(msg)
+    local latest_client_version = msg.LatestClientVersion
+    if not latest_client_version then
+        return
+    end
+    if not latest_client_version and latest_client_version > apm._version then
+        print("⚠️ APM update available v:" .. latest_client_version)
+    end
+end
+
 -------------------------------------------------------------
 
 function DownloadResponseHandler(msg)
@@ -107,7 +117,6 @@ function DownloadResponseHandler(msg)
     local version = msg.Version
     local warnings = msg.Warnings         -- {ModifiesGlobalState:boolean, Message:boolean}
     local dependencies = msg.Dependencies -- {[name:string] = {version:string}}
-    local latest_client_version = msg.LatestClientVersion
 
     if source then
         source = Hexdecode(source)
@@ -119,10 +128,6 @@ function DownloadResponseHandler(msg)
 
     if warnings and warnings.Message then
         print("⚠️ " .. warnings.Message)
-    end
-
-    if not latest_client_version and latest_client_version > apm._version then
-        print("⚠️ APM update available v:" .. latest_client_version)
     end
 
     -- if vendor is @apm remove it and just keep the name
@@ -145,7 +150,6 @@ function DownloadResponseHandler(msg)
         dependencies = json.decode(dependencies) -- "dependencies": {"test-pkg": {"version": "1.0.0"}}
     end
 
-    local depNames = {}
     for dep, depi in pairs(dependencies) do
         -- install dependency and make sure there is no circular install
         if not apm.installed[dep] == depi.version then
@@ -153,6 +157,8 @@ function DownloadResponseHandler(msg)
             apm.install(dep)
         end
     end
+
+    CheckUpdate(msg)
 end
 
 Handlers.add(
@@ -188,6 +194,8 @@ function SearchResponseHandler(msg)
         p = p .. pkg.Vendor .. "/" .. pkg.Name .. " | " .. pkg.Description .. "\n"
     end
     print(p)
+
+    CheckUpdate(msg)
 end
 
 Handlers.add(
@@ -224,6 +232,8 @@ function InfoResponseHandler(msg)
     print("📥 Installs       : " .. Colors.green .. res.TotalInstalls .. Colors.reset)
     print("🔗 APM Url        : " .. Colors.green .. "https://apm.betteridea.dev/pkg?id=" .. res.PkgID .. Colors.reset)
     print("🔗 Repository Url : " .. Colors.green .. res.Repository .. Colors.reset)
+
+    CheckUpdate(msg)
 end
 
 Handlers.add(
