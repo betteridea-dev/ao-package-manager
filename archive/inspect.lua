@@ -21,12 +21,12 @@ function InspectPackage(name, version)
 
     local packages
     if version == "latest" then
-        packages = sql_run(string.format(
+        packages = SQLRun(string.format(
             [[SELECT * FROM Packages WHERE Vendor = "%s" AND Name = "%s" ORDER BY Version DESC LIMIT 1]],
             vendor,
             name))
     else
-        packages = sql_run(string.format(
+        packages = SQLRun(string.format(
             [[SELECT * FROM Packages WHERE Vendor = "%s" AND Name = "%s" AND Version = "%s"]], vendor,
             name,
             version))

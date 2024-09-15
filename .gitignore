@@ -1,3 +1,7 @@
 .env
 wallet.json
+old.wallet.json
+apm_wallet.json
 .DS_Store
+node_modules
+arweave-*

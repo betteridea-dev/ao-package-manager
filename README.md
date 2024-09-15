@@ -12,7 +12,10 @@ Visit [apm.betteridea.dev](https://apm.betteridea.dev) for a graphical interface
 
 </center>
 
-APM ID `UdPDhw5S7pByV3pVqwyr1qzJ8mR8ktzi9olgsdsyZz4`
+<!-- APM ID `UdPDhw5S7pByV3pVqwyr1qzJ8mR8ktzi9olgsdsyZz4` -->
+
+APM ID `zLdXeC7UvNXGGT0W4DbfcSPbnby6d9ZWba1M4MkSZl8`
+
 
 **UPDATE: Need to burn some tokens to publish/update packages or register a vendor. To reduce spam and setup a sustainable registry**\
 **load apm.lua then load the token blueprint to setup**

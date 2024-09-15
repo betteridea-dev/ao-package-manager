@@ -1,6 +1,12 @@
 {
     "Lua.workspace.library": [
-        "/Users/ankush/Library/Application Support/Code/User/globalStorage/sumneko.lua/addonManager/addons/ao/module/library"
+        "/Users/weeblet/Library/Application Support/Code/User/globalStorage/sumneko.lua/addonManager/addons/ao/module/library"
     ],
-    "Lua.workspace.checkThirdParty": false
+    "Lua.workspace.checkThirdParty": false,
+    "Lua.diagnostics.globals": [
+        "sql_write",
+        "sql_run",
+        "handle_run",
+        "split_package_name"
+    ]
 }

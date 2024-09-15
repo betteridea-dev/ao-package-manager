@@ -5,89 +5,67 @@ bint = require('.bint')(256)
 
 db = db or sqlite3.open_memory()
 
-local utils = {
-    add = function(a, b)
-        return tostring(bint(a) + bint(b))
-    end,
-    subtract = function(a, b)
-        return tostring(bint(a) - bint(b))
-    end,
-    toBalanceValue = function(a)
-        return tostring(bint(a))
-    end,
-    toNumber = function(a)
-        return tonumber(a)
-    end
-}
-
------------------------------------------------------- 101000000.0000000000
--- Load the token blueprint after apm.lua
-Denomination = 10
-Balances = Balances or { [ao.id] = utils.toBalanceValue(101000000 * 10 ^ Denomination) }
-TotalSupply = TotalSupply or utils.toBalanceValue(101000000 * 10 ^ Denomination)
-Name = "NEO"
-Ticker = 'NEO'
-Logo = '3rLkpIednEz1kU9h7YplYhEz2bcKvvjd6LBby52cIKo'
-
-------------------------------------------------------
 
 db:exec([[
     CREATE TABLE IF NOT EXISTS Packages (
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        Vendor TEXT DEFAULT "@apm",
         Name TEXT NOT NULL,
         Version TEXT NOT NULL,
-        Vendor TEXT DEFAULT "@apm",
+        Description TEXT NOT NULL,
         Owner TEXT NOT NULL,
         README TEXT NOT NULL,
         PkgID TEXT NOT NULL,
-        Items VARCHAR NOT NULL,
+        Source TEXT NOT NULL,
         Authors_ TEXT NOT NULL,
         Dependencies TEXT NOT NULL,
-        Main TEXT NOT NULL,
-        Description TEXT NOT NULL,
-        RepositoryUrl TEXT NOT NULL,
-        Updated INTEGER NOT NULL,
-        Installs INTEGER DEFAULT 0
+        Repository TEXT NOT NULL,
+        Timestamp INTEGER NOT NULL,
+        Installs INTEGER DEFAULT 0,
+        TotalInstalls INTEGER DEFAULT 0,
+        Keywords TEXT DEFAULT "[]",
+        IsFeatured BOOLEAN DEFAULT 0,
+        Warnings TEXT DEFAULT "{}",
+        License TEXT DEFAULT ""
     );
     CREATE TABLE IF NOT EXISTS Vendors (
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         Name TEXT NOT NULL,
         Owner TEXT NOT NULL
     );
-    -- TODO:
-    CREATE TABLE IF NOT EXISTS Latest10 (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        PkgID TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS Featured (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        PkgID TEXT NOT NULL
-    );
 ]])
 
-------------------------------------------------------
+function Set(list)
+    local set = {}
+    for _, l in ipairs(list) do set[l] = true end
+    return set
+end
 
-function hexencode(str)
+function Hexencode(str)
     return (str:gsub(".", function(char) return string.format("%02x", char:byte()) end))
 end
 
-function hexdecode(hex)
+function Hexdecode(hex)
     return (hex:gsub("%x%x", function(digits) return string.char(tonumber(digits, 16)) end))
 end
 
-function isValidVersion(variant)
+function IsValidVersion(variant)
     return variant:match("^%d+%.%d+%.%d+$")
 end
 
-function isValidPackageName(name)
+function IsValidPackageName(name)
     return name:match("^[a-zA-Z0-9%-_]+$")
 end
 
-function isValidVendor(name)
-    return name:match("^@%w+$")
+function IsValidVendor(name)
+    -- check not nil and matches /^[a-z0-9-]+$/
+    -- local blocklist = { "apm", "ao", "admin", "root", "system", "vendor", "vendors", "package", "packages" }
+    -- return name and name:match("^[a-z0-9-]+$") and not blocklist[name]
+    -- if name doesnot start with @ then add it
+    return name and name:match("^@[a-z0-9-]+$")
 end
 
-function split_package_name(query)
+function SplitPackageName(query)
     local vendor, pkgname, version
 
     -- if only vendor is given
@@ -115,23 +93,23 @@ function split_package_name(query)
 end
 
 -- common error handler
-function handle_run(func, msg)
+function HandleRun(func, msg)
     local ok, err = pcall(func, msg)
     if not ok then
         local clean_err = err:match(":%d+: (.+)") or err
         print(msg.Action .. " - " .. err)
-        if not msg.Target == ao.id then
-            ao.send({
-                Target = msg.From,
-                Data = clean_err,
-                Result = "error"
-            })
-        end
+        -- if not msg.From == ao.id then
+        ao.send({
+            Target = msg.From,
+            Data = clean_err,
+            Result = "error"
+        })
+        -- end
     end
 end
 
 -- easily read from the database
-function sql_run(query, ...)
+function SQLRun(query, ...)
     local m = {}
     local stmt = db:prepare(query)
     if stmt then
@@ -146,7 +124,7 @@ function sql_run(query, ...)
 end
 
 -- easily write to the database
-function sql_write(query, ...)
+function SQLWrite(query, ...)
     local stmt = db:prepare(query)
     if stmt then
         local bind_res = stmt:bind_values(...)
@@ -161,7 +139,7 @@ end
 -- function to list all published packages
 function ListPackages()
     local p_str = "\n"
-    local p = sql_run([[WITH UniqueNames AS (
+    local p = SQLRun([[WITH UniqueNames AS (
     SELECT
         MAX(Version) AS Version, *
     FROM
@@ -174,8 +152,6 @@ SELECT
     Name,
     Version,
     Owner,
-    RepositoryUrl,
-    Description,
     Installs,
     PkgID
 FROM
@@ -193,11 +169,9 @@ FROM
             "@" ..
             pkg.Version ..
             " | " ..
-            (pkg.Description or "no description") ..
-            " | " ..
             pkg.Installs .. " installs" ..
             " | " ..
-            (pkg.RepositoryUrl or "no url") ..
+            pkg.PkgID ..
             "\n"
     end
     return p_str
@@ -205,442 +179,308 @@ end
 
 -- Function to get latest apm client version
 function GetLatestClientVersion()
-    local version = sql_run(
+    local version = SQLRun(
         [[SELECT Version FROM Packages WHERE Name = "apm" AND Vendor = "@apm" ORDER BY Version DESC LIMIT 1]])
     if #version == 0 then
-        return nil
+        return ""
     end
     return version[1].Version
 end
 
--- Checker function to be added in every action to check for updates
-function CheckForAvailableUpdate(msg)
-    local client_version = msg.Version
-    local latest_version = GetLatestClientVersion()
-    if latest_version and client_version ~= latest_version then
-        ao.send({
-            Target = msg.From,
-            Action = "APM.UpdateNotice",
-            Data = string.format(
-                Colors.red ..
-                "📦 An APM client update %s -> %s is available. It is recommended to run APM.update()" .. Colors.reset,
-                client_version, latest_version)
-        })
-    end
+-- Logs = Logs or {}
+function Print(text)
+    print("[APM] " .. text)
 end
 
-------------------------------------------------------
+--------------------------------------------------------
 
+-- function to Register Vendor
 function RegisterVendor(msg)
-    local cost = utils.toBalanceValue(10 * 10 ^ Denomination)
     local name = msg.Data
     local owner = msg.From
 
-
-    assert(type(msg.Quantity) == 'string', 'Quantity is required!')
-    assert(bint(msg.Quantity) <= bint(Balances[msg.From]), 'Quantity must be less than or equal to the current balance!')
-    assert(msg.Quantity == cost, "10 NEO must be burnt to registering a new vendor")
-
-
-    assert(name, "❌ vendor name is required")
-    assert(isValidVendor(name), "❌ Invalid vendor name, must be in the format @vendor")
-    assert(name ~= "@apm", "❌ @apm can't be registered as vendor")
-    assert(name ~= "@registry", "❌ @registry can't be registered as vendor")
-    -- size 3 to 20
-    assert(#name > 3 and #name <= 20, "❌ Vendor name must be between 3 and 20 characters")
-
-    print(name .. " " .. owner .. " " .. msg.From .. " " .. msg.Quantity .. " " .. cost)
-    -- check if vendor already exists
-    local row = sql_run([[SELECT * FROM Vendors WHERE Name = ?]], name)
-    if #row > 0 then
-        error("❌ " .. name .. " already exists")
+    if not name:match("^@") then
+        name = "@" .. name
     end
+    assert(IsValidVendor(name), "Invalid vendor name")
 
-    -- save vendor details
-    local write_res = sql_write([[INSERT INTO Vendors (Name, Owner) VALUES (?, ?)]], name, owner)
-    assert(write_res == 1, "❌[insert error] " .. db:errmsg())
+    local vendor = SQLRun([[SELECT * FROM Vendors WHERE Name = ? AND Owner = ?]], name, owner)
+    assert(#vendor == 0, "Vendor already exists")
 
-    Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
-    TotalSupply = utils.subtract(TotalSupply, msg.Quantity)
+    local res = SQLWrite([[INSERT INTO Vendors (Name, Owner) VALUES (?, ?)]], name, owner)
+    assert(res == 1, db:errmsg())
 
-    print("APM>>> registerd vendor: " .. name .. " by " .. owner)
-
-    ao.send({
+    Print(msg.Action .. " - " .. name)
+    Send {
         Target = msg.From,
-        Data = "Successfully burned 10 $" .. Ticker
-    })
-    ao.send({
-        Target = msg.From,
-        Action = "APM.RegisterVendorResponse",
         Result = "success",
-        Data = "🎉 " .. name .. " registered"
-    })
-    CheckForAvailableUpdate(msg)
+        Data = "🎉 Registered " .. name,
+        LatestClientVersion = GetLatestClientVersion()
+    }
+    -- CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
     "APM.RegisterVendor",
     Handlers.utils.hasMatchingTag("Action", "APM.RegisterVendor"),
     function(msg)
-        handle_run(RegisterVendor, msg)
+        HandleRun(RegisterVendor, msg)
     end
 )
 
-------------------------------------------------------
+--
 
 function Publish(msg)
-    local cost_new = utils.toBalanceValue(10 * 10 ^ Denomination)
-    local cost_update = utils.toBalanceValue(1 * 10 ^ Denomination)
-    local data = json.decode(msg.Data)
-    local name = data.Name
-    local version = data.Version
-    local vendor = data.Vendor or "@apm"
-    local package_data = data.PackageData
-    local owner = msg.From
+    local name = msg.Name
+    local description = msg.Description
+    local vendor = msg.Vendor
+    local version = msg.Version
+    local owner = msg.Owner
+    local pkgid = msg.Id
 
-    -- Prevent publishing from registry process coz assignments have the Tag Action:Publish, which could cause a race condition?
-    if ao.id == msg.From then
-        error("❌ Registry cannot publish packages to itself")
-    end
+    local keywords = msg.Keywords
+    local repo_url = msg.Repository
+    local dependencies = msg.Dependencies
 
-    assert(type(msg.Quantity) == 'string', 'Quantity is required!')
-    assert(Balances[msg.From], "❌ You don't have any $NEO balance")
-    assert(bint(msg.Quantity) <= bint(Balances[msg.From]), 'Quantity must be less than or equal to the current balance!')
+    local source = msg.Source     -- hex encoded lua package source
+    local readme = msg.Readme     -- hex encoded readme
+
+    local warnings = msg.Warnings -- {ModifiesGlobalState:boolean, Message:boolean}
+
+    local authors = msg.Authors   -- {address, name, email, url}[]
+    local license = msg.License
 
 
-    assert(type(name) == "string", "❌ Package name is required")
-    assert(type(version) == "string", "❌ Package version is required")
-    assert(type(vendor) == "string", "❌ vendor is required")
-    assert(type(package_data) == "table", "❌ PackageData is required")
-
-    assert(isValidPackageName(name), "Invalid package name, only alphanumeric characters are allowed")
-    assert(isValidVersion(version), "Invalid package version, must be in the format major.minor.patch")
-    assert(isValidVendor(vendor), "Invalid vendor name, must be in the format @vendor")
-
-    assert(type(package_data.Readme) == "string", "❌ Readme(string) is required in PackageData")
-    assert(type(package_data.RepositoryUrl) == "string", "❌ RepositoryUrl(string) is required in PackageData")
-    assert(type(package_data.Items) == "table", "❌ Items(table) is required in PackageData")
-    assert(type(package_data.Description) == "string", "❌ Description(string) is required in PackageData")
-    assert(type(package_data.Authors) == "table", "❌ Authors(table) is required in PackageData")
-    assert(type(package_data.Dependencies) == "table", "❌ Dependencies(table) is required in PackageData")
-    assert(type(package_data.Main) == "string", "❌ Main(string) is required in PackageData")
-
-    package_data.Readme = hexencode(package_data.Readme)
-
-    local existing = sql_run([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? ORDER BY Version DESC LIMIT 1]], name,
-        vendor)
-
-    if #existing > 0 then
-        assert(existing[1].Owner == owner,
-            "❌ You are not the owner of previously published " .. vendor .. "/" .. name .. "@" .. version)
-        assert(msg.Quantity == cost_update,
-            "1 $NEO must be burnt to update an existing package. You sent: " ..
-            tostring(bint(msg.Quantity) / 10 ^ Denomination))
-    else
-        assert(
-            msg.Quantity == cost_new,
-            "10 $NEO must be burnt to publish a new package. You sent: " .. tostring(bint(msg.Quantity) / 10 ^
-                Denomination)
-        )
-    end
-
-    -- check validity of Items
-    for _, item in ipairs(package_data.Items) do
-        assert(type(item.meta) == "table", "❌ meta(table) is required in Items")
-        assert(type(item.data) == "string", "❌ data(string) is required in Items")
-        for key, value in pairs(item.meta) do
-            assert(type(key) == "string", "❌ meta key must be a string")
-            assert(type(value) == "string", "❌ meta value must be a string")
+    if (keywords) then
+        local keywords_t = json.decode(keywords)
+        assert(type(keywords_t) == "table", "Invalid keywords")
+        for _, keyword in ipairs(keywords_t) do
+            assert(type(keyword) == "string", "Invalid keyword")
         end
     end
-    package_data.Items = hexencode(json.encode(package_data.Items))
 
-    -- check validity of Dependencies
-    for _, dependency in ipairs(package_data.Dependencies) do
-        assert(type(dependency) == "string", "❌ dependency must be a string")
-    end
-    package_data.Dependencies = json.encode(package_data.Dependencies)
-
-
-    -- check validity of Authors
-    for _, author in ipairs(package_data.Authors) do
-        assert(type(author) == "string", "❌ author must be a string")
-    end
-    package_data.Authors = json.encode(package_data.Authors)
-
-    if vendor ~= "@apm" then
-        local v = sql_run([[SELECT * FROM Vendors WHERE Name = ?]], vendor)
-        assert(#v > 0, "❌ " .. vendor .. " does not exist")
-        assert(v[1].Owner == owner, "❌ You are not the owner of " .. vendor)
+    if (warnings) then
+        local warnings_t = json.decode(warnings)
+        assert(type(warnings_t.modifiesGlobalState) == "boolean", "Invalid modifiesGlobalState")
+        assert(type(warnings_t.installMessage) == "string", "Invalid warning")
     end
 
-    -- check if the package already exists with same version
-    local existing = sql_run([[SELECT * FROM Packages WHERE Name = ? AND Version = ? AND Vendor = ?]], name, version,
+    if (authors) then
+        local authors_t = json.decode(authors)
+        for _, author in ipairs(authors_t) do
+            if (author.address) then
+                assert(type(author.address) == "string", "Invalid author address")
+            end
+            if (author.name) then
+                assert(type(author.name) == "string", "Invalid author name")
+            end
+            if (author.email) then
+                assert(type(author.email) == "string", "Invalid author email")
+            end
+            if (author.url) then
+                assert(type(author.url) == "string", "Invalid author url")
+            end
+        end
+    end
+
+    local source_str = Hexencode(source)
+    local readme_str = Hexencode(readme)
+
+    assert(IsValidPackageName(name), "Invalid package name")
+    assert(IsValidVendor(vendor), "Invalid vendor name")
+    assert(IsValidVersion(version), "Invalid version")
+
+    -- check if user owns vendor
+
+
+    -- latest 1 package
+    -- local pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ?]], name, vendor)
+    local pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? ORDER BY Version DESC LIMIT 1]], name,
         vendor)
-    assert(#existing == 0, "❌ " .. vendor .. "/" .. name .. "@" .. version .. " already exists")
 
-    -- insert the package
-    local db_res = sql_write([[
-        INSERT INTO Packages (
-            Name, Version, Vendor, Owner, README, PkgID, Items, Authors_, Dependencies, Main, Description, RepositoryUrl, Updated
+    -- if package exists check if version is greater than the existing one
+    -- if version is greater check if the owner is the same
+    -- if owner is the same then add the new version of the package
+    local total_installs = 0
+    if #pkg > 0 then
+        assert(pkg[1].Owner == owner, "You are not the owner of this package")
+        assert(pkg[1].Version < version, "Version should be greater than the existing one")
+        total_installs = pkg[1].TotalInstalls
+    else
+        if vendor ~= "@apm" then
+            -- check if the vendor exists and owner is the same
+            local vendor_ = SQLRun([[SELECT * FROM Vendors WHERE Name = ? AND Owner = ?]], vendor, owner)
+            assert(#vendor_ > 0, "You are not the owner of this vendor")
+        end
+    end
+
+    local res = SQLWrite(
+        [[INSERT INTO Packages (
+            Vendor,
+            Name,
+            Version,
+            Description,
+            Owner,
+            README,
+            PkgID,
+            Source,
+            Authors_,
+            Dependencies,
+            Repository,
+            Timestamp,
+            Keywords,
+            Warnings,
+            License,
+            TotalInstalls
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        );
-    ]], name, version, vendor, owner, package_data.Readme, msg.Id, package_data.Items, package_data.Authors,
-        package_data.Dependencies, package_data.Main, package_data.Description, package_data.RepositoryUrl, msg
-        .Timestamp)
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?
+        )]],
+        vendor,
+        name,
+        version,
+        description,
+        owner,
+        readme_str,
+        pkgid,
+        source_str,
+        authors,
+        dependencies,
+        repo_url,
+        msg.Timestamp,
+        keywords,
+        warnings,
+        license,
+        total_installs
+    )
 
-    assert(db_res == 1, "❌[insert error] " .. db:errmsg())
+    assert(res == 1, db:errmsg())
 
-    Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
-    TotalSupply = utils.subtract(TotalSupply, msg.Quantity)
-
-    print("APM>>> new package: " .. vendor .. "/" .. name .. "@" .. version .. " by " .. owner)
-
-    ao.send({
+    Print(msg.Action .. " - " .. vendor .. "/" .. name .. "@" .. version)
+    Send {
         Target = msg.From,
-        Data = "Successfully burned " .. msg.Quantity
-    })
-    ao.send({
-        Target = msg.From,
-        Action = "APM.PublishResponse",
         Result = "success",
-        Data = "🎉 " .. vendor .. "/" .. name .. "@" .. version .. " published"
-    })
-    CheckForAvailableUpdate(msg)
+        Data = "🎉 Published " .. name .. "@" .. version,
+        LatestClientVersion = GetLatestClientVersion()
+    }
+    -- CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
     "APM.Publish",
     Handlers.utils.hasMatchingTag("Action", "APM.Publish"),
     function(msg)
-        handle_run(Publish, msg)
+        HandleRun(Publish, msg)
     end
 )
 
-------------------------------------------------------
-
-function Info(msg)
-    local name = msg.Data
-
-    local vendor, pkg_name, version = split_package_name(name)
-    print(vendor)
-    print(pkg_name)
-    print(version)
-
-    local is_package_id = (#name == 43)
-
-    -- if pkgID is sent in data, ignore everything else and get package info
-    if is_package_id then
-        local package = sql_run([[SELECT * FROM Packages WHERE PkgID = ?]], name)
-        assert(#package > 0, "❌ Package not found")
-
-        -- Get available package versions
-        local versions = sql_run([[SELECT Version, PkgID, Installs FROM Packages WHERE Name = ? AND Vendor = ?]],
-            package[1].Name, package[1].Vendor)
-        package[1].Versions = versions
-
-        print("APM>>> info request for " .. package[1].Vendor .. "/" .. package[1].Name .. "@" .. package[1].Version ..
-            " by " .. msg.From)
-        ao.send({
-            Target = msg.From,
-            Action = "APM.InfoResponse",
-            Status = "success",
-            Data = json.encode(package[1])
-        })
-        CheckForAvailableUpdate(msg)
-        return
-    end
-
-    if not vendor then vendor = "@apm" end
-    if not version then version = "latest" end
-
-
-    assert(pkg_name, "Package name is required")
-    assert(isValidPackageName(pkg_name), "Invalid package name, only alphanumeric characters are allowed")
-    assert(isValidVendor(vendor), "Invalid vendor name, must be in the format @vendor")
-
-    if not version then version = "latest" end
-    if version ~= "latest" then
-        assert(isValidVersion(version), "Invalid package version, must be in the format major.minor.patch")
-    end
-
-    local package
-    if version == "latest" then
-        package = sql_run([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? ORDER BY Version DESC LIMIT 1]],
-            pkg_name,
-            vendor)
-    else
-        package = sql_run([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? AND Version = ?]], pkg_name, vendor,
-            version)
-    end
-
-    assert(#package > 0, "❌ @" .. vendor .. "/" .. pkg_name .. "@" .. version .. " not found")
-
-    local versions = sql_run([[SELECT Version, PkgID, Installs FROM Packages WHERE Name = ? AND Vendor = ?]], pkg_name,
-        vendor)
-    package[1].Versions = versions
-
-    print("APM>>> info request for " .. vendor .. "/" .. pkg_name .. "@" .. version .. " by " .. msg.From)
-
-    ao.send({
-        Target = msg.From,
-        Action = "APM.InfoResponse",
-        Data = json.encode(package[1])
-    })
-    CheckForAvailableUpdate(msg)
-end
-
-Handlers.add(
-    "APM.Info",
-    Handlers.utils.hasMatchingTag("Action", "APM.Info"),
-    function(msg)
-        handle_run(Info, msg)
-    end
-)
-
-------------------------------------------------------
-
--- returns top 50 downloaded
-function GetPopular(msg)
-    local packages = sql_run([[
-        WITH UniqueNames AS (
-    SELECT
-        MAX(Version) AS Version, *
-    FROM
-        Packages
-    GROUP BY
-        Name, Vendor
-    ORDER BY
-        Installs DESC
-    LIMIT 50
-)
-SELECT
-    -- README,
-    Vendor,
-    Name,
-    Version,
-    Owner,
-    RepositoryUrl,
-    Description,
-    Installs,
-    Updated,
-    PkgID
-FROM
-    UniqueNames;
-    ]])
-    print("APM>>> get popular request by " .. msg.From .. " found " .. #packages .. " packages")
-    ao.send({
-        Target = msg.From,
-        Action = "APM.GetPopularResponse",
-        Data = json.encode(packages)
-    })
-    CheckForAvailableUpdate(msg)
-end
-
-Handlers.add(
-    "APM.GetPopular",
-    Handlers.utils.hasMatchingTag("Action", "APM.GetPopular"),
-    function(msg)
-        handle_run(GetPopular, msg)
-    end
-)
-
-------------------------------------------------------
-
-function Download(msg)
-    local vendor, name, version = split_package_name(msg.Data)
-    if not version then version = "latest" end
-    if not vendor then vendor = "@apm" end
-
-    -- Prevent installation on registry process coz assignments have the Tag Action:Publish, which could cause a race condition?
-    if msg.From == ao.id then
-        error("❌ Cannot install pacakges on the registry process")
-    end
-
-    assert(name, "❌ Package name is required")
-
-    local res
-    if version == "latest" then
-        res = sql_run([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? ORDER BY Version DESC LIMIT 1]], name,
-            vendor)
-    else
-        res = sql_run([[SELECT * FROM Packages WHERE Name = ? AND Version = ? AND Vendor = ?]], name, version, vendor)
-    end
-
-    assert(#res > 0, "❌ " .. vendor .. "/" .. name .. "@" .. version .. " not found")
-
-    --  increment installs count
-    local inc_res = sql_write(
-        [[UPDATE Packages SET Installs = Installs + 1 WHERE Name = ? AND Version = ? AND Vendor = ?]], name,
-        res[1].Version,
-        vendor)
-    assert(inc_res == 1, "❌[update error] " .. db:errmsg())
-
-    -- Assign({
-    --     Processes = { msg.From },
-    --     Message = res[1].PkgID
-    -- })
-    ao.send({
-        Target = msg.From,
-        Data = res[1].PkgID,
-        AssignableName = res[1].Vendor .. "/" .. res[1].Name .. "@" .. res[1].Version,
-        Action = "APM.DownloadResponse"
-    })
-    CheckForAvailableUpdate(msg)
-    print("APM>>> download request for " .. vendor .. "/" .. name .. "@" .. res[1].Version .. " from " .. msg.From)
-end
-
-Handlers.add(
-    "APM.Download",
-    Handlers.utils.hasMatchingTag("Action", "APM.Download"),
-    function(msg)
-        handle_run(Download, msg)
-    end
-)
-
-------------------------------------------------------
+---------------------------------------------
 
 function Transfer(msg)
-    local vendor, name, _ = split_package_name(msg.Data)
-    if not vendor then vendor = "@apm" end
-    local new_owner = msg.To
+    local name = msg.Name
+    local vendor = msg.Vendor
+    local new_owner = msg.Recipient
+    local owner = msg.From
 
-    assert(name, "❌ Package name is required")
-    assert(new_owner, "❌ New owner is required")
+    assert(IsValidPackageName(name), "Invalid package name")
+    assert(IsValidVendor(vendor), "Invalid vendor name")
 
-    local res = sql_run([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? ORDER BY Version DESC LIMIT 1]], name,
-        vendor)
+    local pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ?
+        ORDER BY Version DESC LIMIT 1
+    ]], name, vendor)
+    assert(#pkg > 0, "Package not found")
+    assert(pkg[1].Owner == owner, "You are not the owner of this package")
 
-    assert(#res > 0, "❌ " .. vendor .. "/" .. name .. " not found")
+    local res = SQLWrite([[UPDATE Packages SET Owner = ? WHERE ID = ?]], new_owner, pkg[1].ID)
+    assert(res == 1, db:errmsg())
 
-    -- user should be either be the owner of the package or the vendor
-    assert(res[1].Owner == msg.From or res[1].Vendor == msg.From, "❌ You are not the owner of " .. vendor .. "/" .. name)
-
-    -- Update owner of the latest version of the package
-    local write_res = sql_write([[UPDATE Packages SET Owner = ? WHERE Name = ? AND Vendor = ? AND Version = ?]],
-        new_owner, name, vendor, res[1].Version)
-    assert(write_res == 1, "❌[update error] " .. db:errmsg())
-
-    print("APM>>> transferred " .. vendor .. "/" .. name .. " to " .. new_owner .. " by " .. msg.From)
-    ao.send({
+    Print(msg.Action .. " - " .. vendor .. "/" .. name .. " to " .. new_owner)
+    Send {
         Target = msg.From,
-        Action = "APM.TransferResponse",
         Result = "success",
-        Data = "🎉 " .. vendor .. "/" .. name .. " transferred to " .. new_owner
-    })
-    CheckForAvailableUpdate(msg)
+        Data = "🎉 Transferred " .. vendor .. "/" .. name .. " to " .. new_owner,
+        LatestClientVersion = GetLatestClientVersion()
+    }
+    -- CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
     "APM.Transfer",
     Handlers.utils.hasMatchingTag("Action", "APM.Transfer"),
     function(msg)
-        handle_run(Transfer, msg)
+        HandleRun(Transfer, msg)
     end
 )
 
-------------------------------------------------------
+---------------------------------------------
+
+function Download(msg)
+    print(msg.Data)
+    local vendor, name, version = SplitPackageName(msg.Data)
+    assert(IsValidVendor(vendor), "Invalid vendor name")
+    assert(IsValidPackageName(name), "Invalid package name")
+    if version then
+        assert(IsValidVersion(version), "Invalid version")
+    end
+
+    local pkg
+    if version then
+        pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? AND Version = ?]], name, vendor,
+            version)
+    else
+        pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? ORDER BY Version DESC LIMIT 1]], name,
+            vendor)
+    end
+
+    assert(#pkg > 0, "Package not found")
+
+    local source = pkg[1].Source
+    local pkgid = pkg[1].PkgID
+
+    local res = SQLWrite([[UPDATE Packages SET Installs = Installs + 1, TotalInstalls = TotalInstalls + 1 WHERE ID = ?]],
+        pkg[1].ID)
+    assert(res == 1, db:errmsg())
+
+    Print(msg.Action .. " - " .. vendor .. "/" .. name .. "@" .. pkg[1].Version .. " by " .. msg.From)
+    Send({
+        Target = msg.From,
+        Result = "success",
+        PkgID = pkgid,
+        Data = vendor .. "/" .. name,
+        Version = pkg[1].Version,
+        Source = source,
+        Warnings = pkg[1].Warnings,
+        Dependencies = pkg[1].Dependencies,
+        Action = "APM.DownloadResponse",
+        LatestClientVersion = GetLatestClientVersion()
+    })
+    -- CheckForAvailableUpdate(msg)
+end
+
+Handlers.add(
+    "APM.Download",
+    Handlers.utils.hasMatchingTag("Action", "APM.Download"),
+    function(msg)
+        HandleRun(Download, msg)
+    end
+)
+
+
+---------------------------------------------
 
 
 function Search(msg)
@@ -648,12 +488,13 @@ function Search(msg)
 
     assert(type(query) == "string", "❌ Search query is required in Data")
 
-    local vendor, pkgname, _ = split_package_name(query)
+    local vendor, pkgname, _ = SplitPackageName(query)
 
-    -- search db based on name if only pkgname is given, else use both vendor and pkgname
-    local packages
+    local res = {}
+
+    local p = {}
     if not vendor then
-        packages = sql_run(
+        p = SQLRun(
             [[
         WITH UniqueNames AS (
     SELECT
@@ -665,11 +506,11 @@ function Search(msg)
     ORDER BY
         Installs DESC
 )
-        SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, RepositoryUrl FROM UniqueNames WHERE Name LIKE ?
+        SELECT DISTINCT * FROM UniqueNames WHERE Name LIKE ? OR Vendor LIKE ?
             ]],
-            "%" .. (pkgname or "") .. "%")
+            "%" .. (pkgname or "") .. "%", "%" .. (pkgname or "") .. "%")
     else
-        packages = sql_run(
+        p = SQLRun(
             [[
         WITH UniqueNames AS (
     SELECT
@@ -679,64 +520,308 @@ function Search(msg)
     GROUP BY
         Name, Vendor
     ORDER BY
-        Installs DESC
+        TotalInstalls DESC
 )
-        SELECT DISTINCT Name, Vendor, Description, PkgID, Version, Installs, RepositoryUrl FROM UniqueNames WHERE Name LIKE ? AND Vendor LIKE ?
+        SELECT DISTINCT * FROM UniqueNames WHERE Name LIKE ? AND Vendor LIKE ?
             ]],
             "%" .. (pkgname or "") .. "%", "%" .. vendor .. "%")
     end
 
-    print("APM>>> searched " ..
-        ((vendor or "---") .. "/" .. (pkgname or "---")) .. " by " .. msg.From .. " found " .. #packages .. " packages")
-    ao.send({
+    for _, pkg in ipairs(p) do
+        table.insert(res, {
+            Vendor = pkg.Vendor,
+            Name = pkg.Name,
+            Version = pkg.Version,
+            Owner = pkg.Owner,
+            Installs = pkg.Installs,
+            TotalInstalls = pkg.TotalInstalls,
+            Description = pkg.Description,
+            Readme = pkg.README,
+            PkgID = pkg.PkgID
+        })
+    end
+
+    Print(msg.Action .. " - " .. query .. " | " .. #p .. " results")
+    Send {
         Target = msg.From,
+        Result = "success",
+        Data = json.encode(res),
         Action = "APM.SearchResponse",
-        Data = json.encode(packages)
-    })
-    CheckForAvailableUpdate(msg)
+        LatestClientVersion = GetLatestClientVersion()
+    }
+    -- CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
     "APM.Search",
     Handlers.utils.hasMatchingTag("Action", "APM.Search"),
     function(msg)
-        handle_run(Search, msg)
+        HandleRun(Search, msg)
     end
 )
 
-------------------------------------------------------
+---------------------------------------------
 
-function UpdateClient(msg)
-    local l = sql_run([[SELECT * FROM Packages WHERE Name = "apm" AND Vendor = "@apm" ORDER BY Version DESC LIMIT 1]])
-    if #l > 0 then
-        -- increment
-        local inc_res = sql_write(
-            [[UPDATE Packages SET Installs = Installs + 1 WHERE Name = "apm" AND Vendor = "@apm" AND Version = ?]],
-            l[1].Version)
-        assert(inc_res == 1, "❌[update error] " .. db:errmsg())
+function Popular(msg)
+    local res = {}
 
-        ao.send({
-            Target = msg.From,
-            Action = "APM.UpdateClientResponse",
-            Data = json.encode(l[1])
-        })
-    else
-        ao.send({
-            Target = msg.From,
-            Data = "No updates available"
+    local p = SQLRun([[WITH UniqueNames AS (
+    SELECT
+        MAX(Version) AS Version, *
+    FROM
+        Packages
+    GROUP BY
+        Name
+)
+SELECT
+    *
+FROM
+    UniqueNames
+ORDER BY
+    TotalInstalls DESC
+LIMIT 50;]])
+
+    for _, pkg in ipairs(p) do
+        table.insert(res, {
+            Vendor = pkg.Vendor,
+            Name = pkg.Name,
+            Version = pkg.Version,
+            Owner = pkg.Owner,
+            Installs = pkg.Installs,
+            TotalInstalls = pkg.TotalInstalls,
+            Description = pkg.Description,
+            Readme = pkg.README,
+            PkgID = pkg.PkgID
         })
     end
-    print("APM>>> update client request by " .. msg.From)
+
+    Print(msg.Action .. " - " .. #p .. " results")
+    Send {
+        Target = msg.From,
+        Result = "success",
+        Data = json.encode(res),
+        Action = "APM.PopularResponse",
+        LatestClientVersion = GetLatestClientVersion()
+    }
+    -- CheckForAvailableUpdate(msg)
 end
 
 Handlers.add(
-    "APM.UpdateClient",
-    Handlers.utils.hasMatchingTag("Action", "APM.UpdateClient"),
+    "APM.Popular",
+    Handlers.utils.hasMatchingTag("Action", "APM.Popular"),
     function(msg)
-        handle_run(UpdateClient, msg)
+        HandleRun(Popular, msg)
     end
 )
 
-------------------------------------------------------
+---------------------------------------------
 
-return "📦 Loaded APM"
+function Info(msg)
+    local vendor, name, version = SplitPackageName(msg.Data)
+
+    if not vendor then
+        vendor = "@apm"
+    end
+    assert(IsValidVendor(vendor), "Invalid vendor name")
+    assert(IsValidPackageName(name), "Invalid package name")
+    if version then
+        assert(IsValidVersion(version), "Invalid version")
+    end
+
+    local pkg
+
+    if version then
+        pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? AND Version = ?]], name, vendor, version)
+    else
+        pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? ORDER BY Version DESC LIMIT 1]], name, vendor)
+    end
+
+    assert(#pkg > 0, "Package not found")
+
+    local res = {
+        Vendor = pkg[1].Vendor,
+        Name = pkg[1].Name,
+        Version = pkg[1].Version,
+        Owner = pkg[1].Owner,
+        Installs = pkg[1].Installs,
+        TotalInstalls = pkg[1].TotalInstalls,
+        Description = pkg[1].Description,
+        Readme = pkg[1].README,
+        PkgID = pkg[1].PkgID,
+        Source = pkg[1].Source,
+        Authors = pkg[1].Authors_,
+        Dependencies = pkg[1].Dependencies,
+        Repository = pkg[1].Repository,
+        Keywords = pkg[1].Keywords,
+        Warnings = pkg[1].Warnings,
+        License = pkg[1].License
+    }
+
+    Print(msg.Action .. " - " .. vendor .. "/" .. name .. "@" .. pkg[1].Version)
+    Send {
+        Target = msg.From,
+        Result = "success",
+        Data = json.encode(res),
+        Action = "APM.InfoResponse",
+        LatestClientVersion = GetLatestClientVersion()
+    }
+    -- CheckForAvailableUpdate(msg)
+end
+
+Handlers.add(
+    "APM.Info",
+    Handlers.utils.hasMatchingTag("Action", "APM.Info"),
+    function(msg)
+        HandleRun(Info, msg)
+    end
+)
+
+---------------------------------------------
+
+function VendorOrAddressPackages(msg)
+    local vendor_or_address = msg.Data
+
+    local search_address = (#vendor_or_address == 43)
+
+    if not search_address then
+        assert(IsValidVendor(vendor_or_address), "Invalid vendor name")
+    end
+
+    local res = {}
+    local p
+    if search_address then
+        p = SQLRun([[WITH UniqueNames AS (
+        SELECT
+            MAX(Version) AS Version, *
+        FROM
+            Packages
+        WHERE
+            Owner = ?
+        GROUP BY
+            Name
+    )
+    SELECT
+        *
+    FROM
+        UniqueNames
+    ORDER BY
+        Timestamp DESC;]], vendor_or_address)
+    else
+        p = SQLRun([[WITH UniqueNames AS (
+        SELECT
+            MAX(Version) AS Version, *
+        FROM
+            Packages
+        WHERE
+            Vendor = ?
+        GROUP BY
+            Name
+    )
+    SELECT
+        *
+    FROM
+        UniqueNames
+    ORDER BY
+        Timestamp DESC;]], vendor_or_address)
+    end
+
+    for _, pkg in ipairs(p) do
+        table.insert(res, {
+            Vendor = pkg.Vendor,
+            Name = pkg.Name,
+            Version = pkg.Version,
+            Owner = pkg.Owner,
+            Installs = pkg.Installs,
+            TotalInstalls = pkg.TotalInstalls,
+            Description = pkg.Description,
+            Readme = pkg.README,
+            PkgID = pkg.PkgID
+        })
+    end
+
+    Print(msg.Action .. " - " .. vendor_or_address .. " | " .. #p .. " results")
+    Send {
+        Target = msg.From,
+        Result = "success",
+        Data = json.encode(res),
+        Action = "APM.VendorPackagesResponse",
+        LatestClientVersion = GetLatestClientVersion()
+    }
+    -- CheckForAvailableUpdate(msg)
+end
+
+Handlers.add(
+    "APM.VendorOrAddressPackages",
+    Handlers.utils.hasMatchingTag("Action", "APM.VendorOrAddressPackages"),
+    function(msg)
+        HandleRun(VendorOrAddressPackages, msg)
+    end
+)
+
+---------------------------------------------
+
+function Update(msg)
+    print("Update requested")
+    local pkg = SQLRun([[SELECT * FROM Packages WHERE Name = "apm" AND Vendor = "@apm" ORDER BY Version DESC LIMIT 1]])
+    assert(#pkg > 0, "APM package not found")
+
+    local source = pkg[1].Source
+    local pkgid = pkg[1].PkgID
+    local version = pkg[1].Version
+
+    Send({
+        Target = msg.From,
+        Result = "success",
+        PkgID = pkgid or "",
+        Data = "@apm/apm",
+        Version = version or "",
+        Source = source or "",
+        Action = "APM.UpdateResponse",
+        LatestClientVersion = GetLatestClientVersion() or ""
+    })
+end
+
+Handlers.add(
+    "APM.Update",
+    Handlers.utils.hasMatchingTag("Action", "APM.Update"),
+    function(msg)
+        HandleRun(Update, msg)
+    end
+)
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+
+-- PORT FROM PREVIOUS REGISTRY
+
+-- function Port(msg)
+--     if msg.From == Owner then
+--         local pkgid = msg.Id
+--         local sql_query = msg.Data
+--         -- from sql_query replace <MID> with pkgid
+--         sql_query = sql_query:gsub("<MID>", pkgid)
+--         -- print(sql_query)
+--         local res = SQLWrite(sql_query)
+
+--         print(msg.Action .. " - " .. res .. " - " .. db:errmsg())
+--     end
+-- end
+
+-- Handlers.add(
+--     "APM.Port",
+--     Handlers.utils.hasMatchingTag("Action", "APM.Port"),
+--     function(msg)
+--         HandleRun(Port, msg)
+--     end
+-- )
+
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+
+
+return "📦 APM Loaded"

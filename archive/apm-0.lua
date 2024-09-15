@@ -20,6 +20,15 @@ local utils = {
     end
 }
 
+------------------------------------------------------ 101000000.0000000000
+-- Load the token blueprint after apm.lua
+Denomination = 10
+Balances = Balances or { [ao.id] = utils.toBalanceValue(101000000 * 10 ^ Denomination) }
+TotalSupply = TotalSupply or utils.toBalanceValue(101000000 * 10 ^ Denomination)
+Name = "NEO"
+Ticker = 'NEO'
+Logo = '3rLkpIednEz1kU9h7YplYhEz2bcKvvjd6LBby52cIKo'
+
 ------------------------------------------------------
 
 db:exec([[
@@ -147,29 +156,6 @@ function SQLWrite(query, ...)
         stmt:finalize()
     end
     return db:changes()
-end
-
-function dum_db(process_id)
-    local p = SQLRun([[SELECT * FROM Packages]])
-    local v = SQLRun([[SELECT * FROM Vendors]])
-    local l = SQLRun([[SELECT * FROM Latest10]])
-    local f = SQLRun([[SELECT * FROM Featured]])
-    local b = Balances
-    local t = TotalSupply
-    local d = db:dump()
-    local data = {
-        Packages = p,
-        Vendors = v,
-        Latest10 = l,
-        Featured = f,
-        Balances = b,
-        TotalSupply = t,
-        DB = d
-    }
-    ao.send({
-        Target = process_id,
-        Data = json.encode(data)
-    })
 end
 
 -- function to list all published packages
@@ -591,15 +577,9 @@ function Download(msg)
         vendor)
     assert(inc_res == 1, "❌[update error] " .. db:errmsg())
 
-    -- Assign({
-    --     Processes = { msg.From },
-    --     Message = res[1].PkgID
-    -- })
-    ao.send({
-        Target = msg.From,
-        Data = res[1].PkgID,
-        AssignableName = res[1].Vendor .. "/" .. res[1].Name .. "@" .. res[1].Version,
-        Action = "APM.DownloadResponse"
+    Assign({
+        Processes = { msg.From },
+        Message = res[1].PkgID
     })
     CheckForAvailableUpdate(msg)
     print("APM>>> download request for " .. vendor .. "/" .. name .. "@" .. res[1].Version .. " from " .. msg.From)
