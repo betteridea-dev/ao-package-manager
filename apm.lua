@@ -192,6 +192,20 @@ function Print(text)
     print("[APM] " .. text)
 end
 
+function UpdateTotal()
+    -- sum total installs of all versions and update for all packages
+    local p = SQLRun([[SELECT DISTINCT Name, Vendor FROM Packages]])
+    for _, pkg in ipairs(p) do
+        local total_installs = SQLRun([[SELECT SUM(Installs) AS Total FROM Packages WHERE Name = ? AND Vendor = ?]],
+            pkg.Name, pkg.Vendor)
+        local res = SQLWrite([[UPDATE Packages SET TotalInstalls = ? WHERE Name = ? AND Vendor = ?]],
+            total_installs[1].Total,
+            pkg.Name, pkg.Vendor)
+    end
+
+    return "Total installs updated"
+end
+
 --------------------------------------------------------
 
 -- function to Register Vendor
@@ -242,8 +256,11 @@ function Publish(msg)
     local repo_url = msg.Repository
     local dependencies = msg.Dependencies
 
-    local source = msg.Source     -- hex encoded lua package source
-    local readme = msg.Readme     -- hex encoded readme
+    local data = msg.Data -- {source, readme} in hex
+    data = json.decode(data)
+    local source = data.source
+    local readme = data.readme
+
 
     local warnings = msg.Warnings -- {ModifiesGlobalState:boolean, Message:boolean}
 
@@ -451,18 +468,22 @@ function Download(msg)
     local source = pkg[1].Source
     local pkgid = pkg[1].PkgID
 
-    local res = SQLWrite([[UPDATE Packages SET Installs = Installs + 1, TotalInstalls = TotalInstalls + 1 WHERE ID = ?]],
+    local res = SQLWrite([[UPDATE Packages SET Installs = Installs + 1 WHERE ID = ?]],
         pkg[1].ID)
     assert(res == 1, db:errmsg())
+    res = SQLWrite([[UPDATE Packages SET TotalInstalls = TotalInstalls + 1 WHERE Vendor = ? AND Name = ?]],
+        pkg[1].Vendor, pkg[1].Name)
+    assert(res == 1, db:errmsg())
+
 
     Print(msg.Action .. " - " .. vendor .. "/" .. name .. "@" .. pkg[1].Version .. " by " .. msg.From)
     Send({
         Target = msg.From,
         Result = "success",
         PkgID = pkgid,
-        Data = vendor .. "/" .. name,
+        Name = vendor .. "/" .. name,
         Version = pkg[1].Version,
-        Source = source,
+        Data = source,
         Warnings = pkg[1].Warnings,
         Dependencies = pkg[1].Dependencies,
         Action = "APM.DownloadResponse",
@@ -590,8 +611,9 @@ LIMIT 50;]])
             Installs = pkg.Installs,
             TotalInstalls = pkg.TotalInstalls,
             Description = pkg.Description,
-            Readme = pkg.README,
-            PkgID = pkg.PkgID
+            -- Readme = pkg.README,
+            PkgID = pkg.PkgID,
+            Repository = pkg.Repository
         })
     end
 
@@ -639,6 +661,7 @@ function Info(msg)
     assert(#pkg > 0, "Package not found")
 
     local res = {
+        ID = pkg[1].ID,
         Vendor = pkg[1].Vendor,
         Name = pkg[1].Name,
         Version = pkg[1].Version,
@@ -646,16 +669,20 @@ function Info(msg)
         Installs = pkg[1].Installs,
         TotalInstalls = pkg[1].TotalInstalls,
         Description = pkg[1].Description,
-        Readme = pkg[1].README,
         PkgID = pkg[1].PkgID,
         Source = pkg[1].Source,
+        Readme = pkg[1].README,
         Authors = pkg[1].Authors_,
         Dependencies = pkg[1].Dependencies,
         Repository = pkg[1].Repository,
         Keywords = pkg[1].Keywords,
         Warnings = pkg[1].Warnings,
-        License = pkg[1].License
+        License = pkg[1].License,
+        Timestamp = pkg[1].Timestamp
     }
+
+    local versions = SQLRun([[SELECT Version, PkgID, Installs FROM Packages WHERE Name = ? AND Vendor = ?]], name, vendor)
+    res.Versions = versions
 
     Print(msg.Action .. " - " .. vendor .. "/" .. name .. "@" .. pkg[1].Version)
     Send {
@@ -773,9 +800,9 @@ function Update(msg)
         Target = msg.From,
         Result = "success",
         PkgID = pkgid or "",
-        Data = "@apm/apm",
+        Name = "@apm/apm",
         Version = version or "",
-        Source = source or "",
+        Data = source or "",
         Action = "APM.UpdateResponse",
         LatestClientVersion = GetLatestClientVersion() or ""
     })

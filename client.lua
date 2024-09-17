@@ -108,12 +108,12 @@ function DownloadResponseHandler(msg)
     end
 
     if not msg.Result == "success" then
-        print("Download failed: " .. msg.Data)
+        print("Download failed: " .. msg.Name)
         return
     end
 
-    local source = msg.Source
-    local name = msg.Data
+    local source = msg.Data
+    local name = msg.Name
     local version = msg.Version
     local warnings = msg.Warnings         -- {ModifiesGlobalState:boolean, Message:boolean}
     local dependencies = msg.Dependencies -- {[name:string] = {version:string}}
@@ -259,7 +259,7 @@ function UpdateResponseHandler(msg)
         return
     end
 
-    local source = msg.Source
+    local source = msg.Data
     local version = msg.Version
 
     if source then
