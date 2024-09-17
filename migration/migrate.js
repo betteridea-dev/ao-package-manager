@@ -105,7 +105,7 @@ for (let i = 0; i < packages.length; i++) {
             '${source}', 
             '[]', 
             '{}', 
-            '${element.Repository}', 
+            '${element.RepositoryUrl}', 
             ${element.Updated},
             '<MID>',
             ${element.Installs});`
