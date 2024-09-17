@@ -258,6 +258,7 @@ function Publish(msg)
 
     local data = msg.Data -- {source, readme} in hex
     data = json.decode(data)
+    print(data)
     local source = data.source
     local readme = data.readme
 
@@ -266,6 +267,8 @@ function Publish(msg)
 
     local authors = msg.Authors   -- {address, name, email, url}[]
     local license = msg.License
+
+    Print("Publishing " .. vendor .. "/" .. name .. "@" .. version .. " by " .. owner)
 
 
     if (keywords) then
@@ -472,8 +475,8 @@ function Download(msg)
         pkg[1].ID)
     assert(res == 1, db:errmsg())
     res = SQLWrite([[UPDATE Packages SET TotalInstalls = TotalInstalls + 1 WHERE Vendor = ? AND Name = ?]],
-        pkg[1].Vendor, pkg[1].Name)
-    assert(res == 1, db:errmsg())
+        vendor, name)
+    assert(res > 0, db:errmsg())
 
 
     Print(msg.Action .. " - " .. vendor .. "/" .. name .. "@" .. pkg[1].Version .. " by " .. msg.From)

@@ -270,7 +270,7 @@ function UpdateResponseHandler(msg)
         local function _load()
             %s
         end
-        apm = _load()
+        -- apm = _load()
     ]], source))
   if not func then
     error("Error compiling load function: " .. err)
@@ -279,6 +279,7 @@ function UpdateResponseHandler(msg)
 
   apm._version = version
   print("✅ Updated APM to v:" .. version)
+  print("Please use 'apm' namespace for all commands")
 end
 
 Handlers.add(
@@ -361,6 +362,36 @@ function apm.info(query)
     Data = query
   })
   return "📦 Info requested for " .. query
+end
+
+function apm.uninstall(name)
+  local vendor, pkgname
+  _ = SplitPackageName(name)
+  if not vendor then
+    vendor = "@apm"
+  end
+  if not IsValidVendor(vendor) then
+    return error("Invalid vendor name")
+  end
+  if not IsValidPackageName(pkgname) then
+    return error("Invalid package name")
+  end
+
+  local pkgnv = vendor .. "/" .. pkgname
+  local pkg = apm.installed[pkgnv]
+
+  if not pkg then
+    return error("Package not installed")
+  end
+
+
+  apm.installed[pkgnv] = nil
+  if vendor == "@apm" then
+    _G.package.loaded[name] = nil
+  else
+    _G.package.loaded[pkgnv] = nil
+  end
+  return "📦 Uninstalled " .. pkgnv
 end
 
 print("📦 APM client v" .. apm._version .. " loaded")
