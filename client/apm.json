@@ -1,0 +1,23 @@
+{
+    "$schema": "https://raw.githubusercontent.com/ankushKun/apm-cli/main/apm.schema.json",
+    "name": "apm",
+    "vendor": "@apm",
+    "description": "Package Manager for AO",
+    "main": "client.lua",
+    "version": "2.0.0",
+    "repository": "https://github.com/betteridea-dev/ao-package-manager/",
+    "license": "MIT",
+    "wallet": "./wallet.json",
+    "keywords": [
+        "ao",
+        "apm",
+        "packge manager",
+        "betteridea"
+    ],
+    "authors": [],
+    "warnings": {
+        "modifiesGlobalState": false,
+        "installMessage": ""
+    },
+    "dependencies": {}
+}
