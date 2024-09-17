@@ -93,8 +93,8 @@ function CheckUpdate(msg)
   if not latest_client_version then
     return
   end
-  if not latest_client_version and latest_client_version > apm._version then
-    print("⚠️ APM update available v:" .. latest_client_version)
+  if latest_client_version and latest_client_version > apm._version then
+    print("⚠️ APM update available v:" .. latest_client_version .. " run 'apm.update()'")
   end
 end
 
