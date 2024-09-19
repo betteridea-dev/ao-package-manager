@@ -5,3 +5,4 @@ apm_wallet.json
 .DS_Store
 node_modules
 arweave-*
+dist
