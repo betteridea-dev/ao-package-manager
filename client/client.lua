@@ -14,7 +14,7 @@
 -- Built with ❤️ by BetterIDEa
 
 local apm_id = "DKF8oXtPvh3q8s0fJFIeHFyHNM6oKrwMCUrPxEMroak"
-local apm_version = "2.0.0"
+local apm_version = "2.0.5"
 
 json = require("json")
 base64 = require(".base64")
@@ -34,7 +34,8 @@ function Hexdecode(hex)
 end
 
 function IsValidVersion(variant)
-  return variant:match("^%d+%.%d+%.%d+$")
+  -- version string or 43 char message_id
+  return variant:match("^%d+%.%d+%.%d+$") or (variant:match("^[a-zA-Z0-9%-%_]+$") and #variant == 43)
 end
 
 function IsValidPackageName(name)
@@ -45,6 +46,10 @@ function IsValidVendor(name)
   return name and name:match("^@[a-z0-9-]+$")
 end
 
+-- can be @vendor/pkgname or pkgname
+-- can be @vendor/pkgname@version or pkgname@version
+-- can be @vendor/pkgname@message_id or pkgname@message_id
+-- message_id length is 43 chars
 function SplitPackageName(query)
   local vendor, pkgname, version
 
@@ -58,6 +63,15 @@ function SplitPackageName(query)
   if version_index then
     version = query:sub(version_index + 1)
     query = query:sub(1, version_index - 1)
+  else
+    -- check if length > 43 and last 43 chars are message_id
+    if #query > 45 then
+      local message_id = query:sub(-43)
+      if message_id:match("^[a-zA-Z0-9%-%_]+$") then
+        version = message_id
+        query = query:sub(1, -44)
+      end
+    end
   end
 
   -- check if vendor is provided
@@ -143,21 +157,24 @@ function DownloadResponseHandler(msg)
     error("Error compiling load function: " .. err)
   end
   func()
-  print("✅ Downloaded " .. name .. "@" .. version)
+
   apm.installed[name] = version
 
   if dependencies then
     dependencies = json.decode(dependencies) -- "dependencies": {"test-pkg": {"version": "1.0.0"}}
   end
+  -- print(dependencies)
 
   for dep, depi in pairs(dependencies) do
+    -- print("📦 Checking dependency " .. dep .. "@" .. depi.version)
     -- install dependency and make sure there is no circular install
-    if not apm.installed[dep] == depi.version then
+    if not (apm.installed[dep] == depi.version) then
       print("ℹ️ Installing dependency " .. dep .. "@" .. depi.version)
       apm.install(dep)
     end
   end
 
+  print("✅ Downloaded " .. name .. "@" .. version)
   CheckUpdate(msg)
 end
 
@@ -292,7 +309,7 @@ Handlers.add(
 
 -------------------------------------------------------------
 
-apm = {}
+apm = apm or {}
 apm.ID = apm_id
 apm._version = apm._version or apm_version
 apm.installed = apm.installed or {}
@@ -313,9 +330,12 @@ function apm.install(name)
   end
 
   local pkgnv = vendor .. "/" .. pkgname
-  local pkg = apm.installed[pkgnv]
-  if pkg then
-    return error("Package already installed")
+  local pkg_ver = apm.installed[pkgnv]
+  if pkg_ver then
+    -- return error("Package already installed. Use apm.uninstall to remove it")
+    if version and pkg_ver == version then
+      return "✅ Package " .. pkgnv .. " already installed"
+    end
   end
 
   if version then
@@ -365,8 +385,7 @@ function apm.info(query)
 end
 
 function apm.uninstall(name)
-  local vendor, pkgname
-  _ = SplitPackageName(name)
+  local vendor, pkgname, _ = SplitPackageName(name)
   if not vendor then
     vendor = "@apm"
   end
@@ -391,7 +410,7 @@ function apm.uninstall(name)
   else
     _G.package.loaded[pkgnv] = nil
   end
-  return "📦 Uninstalled " .. pkgnv
+  return "🗑️ Uninstalled " .. pkgnv
 end
 
 print("📦 APM client v" .. apm._version .. " loaded")

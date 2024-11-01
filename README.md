@@ -14,6 +14,7 @@ Visit [apm.betteridea.dev](https://apm.betteridea.dev) for a graphical interface
 
 APM ID `DKF8oXtPvh3q8s0fJFIeHFyHNM6oKrwMCUrPxEMroak`
 
+<!-- aos apm --wallet wallet.json -->
 
 ## Client Usage (For users wanting to install packages)
 

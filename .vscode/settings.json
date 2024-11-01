@@ -7,6 +7,7 @@
         "sql_write",
         "sql_run",
         "handle_run",
-        "split_package_name"
+        "split_package_name",
+        "apm"
     ]
 }

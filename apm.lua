@@ -50,7 +50,8 @@ function Hexdecode(hex)
 end
 
 function IsValidVersion(variant)
-    return variant:match("^%d+%.%d+%.%d+$")
+    -- version string or 43 char message_id
+    return variant:match("^%d+%.%d+%.%d+$") or (variant:match("^[a-zA-Z0-9%-%_]+$") and #variant == 43)
 end
 
 function IsValidPackageName(name)
@@ -459,8 +460,8 @@ function Download(msg)
 
     local pkg
     if version then
-        pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? AND Version = ?]], name, vendor,
-            version)
+        pkg = SQLRun([[(SELECT * FROM Packages WHERE Name = ? AND Vendor = ? AND Version = ?) OR PkgID = ?]], name,
+            vendor, version, version)
     else
         pkg = SQLRun([[SELECT * FROM Packages WHERE Name = ? AND Vendor = ? ORDER BY Version DESC LIMIT 1]], name,
             vendor)
