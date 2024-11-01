@@ -16,18 +16,16 @@ APM ID `DKF8oXtPvh3q8s0fJFIeHFyHNM6oKrwMCUrPxEMroak`
 
 <!-- aos apm --wallet wallet.json -->
 
-## Client Usage (For users wanting to install packages)
+## Install APM Client 
 
-### Load client tool
+Installer: [installer.lua](/installer.lua)
 
-Client tool: [client-tool.lua](/client-tool.lua)
+Client Source: [client.lua](/client/client.lua)
 
-Load `client.lua` file, this will load necessary handlers and functions to interact with the APM process.
+Load `installer.lua` file, this will send a request to the APM registry to install the latest published client. Or you can load the client source file directly, but this wont guarantee that you have the latest or stable version.
 
 ```lua
-.load client.lua
--- or you can also load the blueprint
-.load-blueprint apm.lua
+.load-blueprint apm
 ```
 
 The APM process id is stored in the `apm.ID` variable.
