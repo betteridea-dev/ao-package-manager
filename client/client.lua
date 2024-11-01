@@ -8,7 +8,7 @@
 -- /__/     \__\ | _|      |__|  |__| (__)_______| \______/  /__/     \__\
 --
 ---------------------------------------------------------------------------
--- APM Registry source code: https://github.com/ankushKun/ao-package-manager
+-- APM Registry source code: https://github.com/betteridea-dev/ao-package-manager
 -- CLI tool for managing packages: https://www.npmjs.com/package/apm-tool
 -- Web UI for browsing & publishing packages: https://apm.betteridea.dev
 -- Built with ❤️ by BetterIDEa
@@ -264,7 +264,6 @@ Handlers.add(
 -------------------------------------------------------------
 
 function UpdateResponseHandler(msg)
-  print("Update requested")
   local from = msg.From
   if not from == apm.ID then
     print("Attempt to update from illegal source")
@@ -288,6 +287,7 @@ function UpdateResponseHandler(msg)
             %s
         end
         -- apm = _load()
+        _load()
     ]], source))
   if not func then
     error("Error compiling load function: " .. err)
@@ -413,4 +413,5 @@ function apm.uninstall(name)
   return "🗑️ Uninstalled " .. pkgnv
 end
 
-print("📦 APM client v" .. apm._version .. " loaded")
+print("✅ APM client v" .. apm._version .. " loaded")
+print("usage: apm.install <package name>")
