@@ -4,7 +4,7 @@
     "vendor": "@apm",
     "description": "Package Manager for AO",
     "main": "client.lua",
-    "version": "2.0.5",
+    "version": "2.0.6",
     "repository": "https://github.com/betteridea-dev/ao-package-manager/",
     "license": "MIT",
     "wallet": "./wallet.json",
