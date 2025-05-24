@@ -14,7 +14,7 @@
 -- Built with ❤️ by BetterIDEa
 
 local apm_id = "DKF8oXtPvh3q8s0fJFIeHFyHNM6oKrwMCUrPxEMroak"
-local apm_version = "2.0.5"
+local apm_version = "2.0.6"
 
 json = require("json")
 base64 = require(".base64")
