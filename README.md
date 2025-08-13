@@ -12,7 +12,7 @@ Visit [apm.betteridea.dev](https://apm.betteridea.dev) for a graphical interface
 
 <!-- APM ID `UdPDhw5S7pByV3pVqwyr1qzJ8mR8ktzi9olgsdsyZz4` -->
 
-APM ID `DKF8oXtPvh3q8s0fJFIeHFyHNM6oKrwMCUrPxEMroak`
+APM ID `RLvG3tclmALLBCrwc17NqzNFqZCrUf3-RKZ5v8VRHiU`
 
 <!-- aos apm --wallet wallet.json -->
 

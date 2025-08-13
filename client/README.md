@@ -12,14 +12,16 @@ Visit [apm.betteridea.dev](https://apm.betteridea.dev) for a graphical interface
 
 <!-- APM ID `UdPDhw5S7pByV3pVqwyr1qzJ8mR8ktzi9olgsdsyZz4` -->
 
-APM ID `DKF8oXtPvh3q8s0fJFIeHFyHNM6oKrwMCUrPxEMroak`
+<!-- APM ID `DKF8oXtPvh3q8s0fJFIeHFyHNM6oKrwMCUrPxEMroak` -->
+
+APM ID `RLvG3tclmALLBCrwc17NqzNFqZCrUf3-RKZ5v8VRHiU`
 
 
 ## Client Usage (For users wanting to install packages)
 
 ### Load client tool
 
-Client tool: [client-tool.lua](/client-tool.lua)
+Client tool: [client.lua](/client.lua)
 
 Load `client.lua` file, this will load necessary handlers and functions to interact with the APM process.
 
@@ -30,6 +32,12 @@ Load `client.lua` file, this will load necessary handlers and functions to inter
 ```
 
 The APM process id is stored in the `apm.ID` variable.
+
+Make sure to always use the latest APM process id
+
+```
+apm.ID = "RLvG3tclmALLBCrwc17NqzNFqZCrUf3-RKZ5v8VRHiU"
+```
 
 ### Show installed pacakges
 

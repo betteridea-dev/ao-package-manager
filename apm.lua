@@ -15,7 +15,7 @@ db:exec([[
         Description TEXT NOT NULL,
         Owner TEXT NOT NULL,
         README TEXT NOT NULL,
-        PkgID TEXT NOT NULL,
+        PkgID TEXT NOT NULL UNIQUE,
         Source TEXT NOT NULL,
         Authors_ TEXT NOT NULL,
         Dependencies TEXT NOT NULL,
@@ -30,7 +30,7 @@ db:exec([[
     );
     CREATE TABLE IF NOT EXISTS Vendors (
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        Name TEXT NOT NULL,
+        Name TEXT NOT NULL UNIQUE,
         Owner TEXT NOT NULL
     );
 ]])
@@ -827,26 +827,26 @@ Handlers.add(
 
 -- PORT FROM PREVIOUS REGISTRY
 
--- function Port(msg)
---     if msg.From == Owner then
---         local pkgid = msg.Id
---         local sql_query = msg.Data
---         -- from sql_query replace <MID> with pkgid
---         sql_query = sql_query:gsub("<MID>", pkgid)
---         -- print(sql_query)
---         local res = SQLWrite(sql_query)
+function Port(msg)
+    if msg.From == Owner then
+        local pkgid = msg.Id
+        local sql_query = msg.Data
+        -- from sql_query replace <MID> with pkgid
+        sql_query = sql_query:gsub("<MID>", pkgid)
+        -- print(sql_query)
+        local res = SQLWrite(sql_query)
 
---         print(msg.Action .. " - " .. res .. " - " .. db:errmsg())
---     end
--- end
+        print(msg.Action .. " - " .. res .. " - " .. db:errmsg())
+    end
+end
 
--- Handlers.add(
---     "APM.Port",
---     Handlers.utils.hasMatchingTag("Action", "APM.Port"),
---     function(msg)
---         HandleRun(Port, msg)
---     end
--- )
+Handlers.add(
+    "APM.Port",
+    Handlers.utils.hasMatchingTag("Action", "APM.Port"),
+    function(msg)
+        HandleRun(Port, msg)
+    end
+)
 
 
 --------------------------------------------------------------------------
@@ -855,4 +855,4 @@ Handlers.add(
 --------------------------------------------------------------------------
 
 
-return "📦 APM Loaded"
+return "📦 APM Registry Loaded"

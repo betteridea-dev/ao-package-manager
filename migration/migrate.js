@@ -1,9 +1,9 @@
 import { readFileSync } from "fs"
 import { message, createDataItemSigner } from "@permaweb/aoconnect"
 
-const dump = JSON.parse(readFileSync("./dump.json", "utf8"))
-const jwk = JSON.parse(readFileSync("../wallet.json", "utf8")) // new apm wallet
-const apm_id = "DKF8oXtPvh3q8s0fJFIeHFyHNM6oKrwMCUrPxEMroak" // new apm id
+const dump = JSON.parse(readFileSync("./dump-1.json", "utf8"))
+const jwk = JSON.parse(readFileSync("../new-new-wallet.json", "utf8")) // new apm wallet
+const apm_id = "RLvG3tclmALLBCrwc17NqzNFqZCrUf3-RKZ5v8VRHiU" // new apm id
 
 /*
 // vendors structure
@@ -58,66 +58,80 @@ License TEXT DEFAULT ""
 const vendors = dump.Vendors
 const packages = dump.Packages
 
-console.log(vendors.length, "vendors")
-console.log(packages.length, "packages")
-
-for (let i = 0; i < vendors.length; i++) {
-    const element = vendors[i]
-    const sql = `INSERT INTO Vendors (Name, Owner) VALUES ('${element.Name}', '${element.Owner}');`
-
-    console.log(element.Vendor, element.Name, element.Version)
-    await message({
-        process: apm_id,
-        signer: createDataItemSigner(jwk),
-        data: sql,
-        tags: [{ name: "Action", value: "APM.Port" }]
-    })
+function sqlEscape(value) {
+    return String(value ?? "").replace(/'/g, "''")
 }
 
-for (let i = 0; i < packages.length; i++) {
-    const element = packages[i]
-    const items = JSON.parse(Buffer.from(element.Items, "hex").toString())
-    let source = items[0].data
-    // source string to hex
-    source = Buffer.from(source).toString("hex")
+async function main() {
+    console.log(vendors.length, "vendors")
+    console.log(packages.length, "packages")
 
-    const sql = `INSERT INTO Packages (
-        Vendor,
-        Name,
-        Version,
-        Description,
-        Owner,
-        README,
-        Source,
-        Authors_,
-        Dependencies,
-        Repository,
-        Timestamp,
-        PkgID,
-        Installs
-        ) VALUES (
-            '${element.Vendor}',
-            '${element.Name}', 
-            '${element.Version}', 
-            '${element.Description}', 
-            '${element.Owner}', 
-            '${element.README}', 
-            '${source}', 
-            '[]', 
-            '{}', 
-            '${element.RepositoryUrl}', 
-            ${element.Updated},
-            '<MID>',
-            ${element.Installs});`
+    for (let i = 0; i < vendors.length; i++) {
+        const element = vendors[i]
+        const sql = `INSERT INTO Vendors (Name, Owner) VALUES ('${sqlEscape(element.Name)}', '${sqlEscape(element.Owner)}');`
+        const mid = await message({
+            process: apm_id,
+            signer: createDataItemSigner(jwk),
+            data: sql,
+            tags: [{ name: "Action", value: "APM.Port" }]
+        })
+        console.log("vendor:", mid, element.ID, element.Name)
+    }
 
+    for (let i = 0; i < packages.length; i++) {
+        const element = packages[i]
+        try {
+            const sourceHex = element.Source || ''
+            const readmeHex = element.README || ''
+            const repository = element.Repository || element.RepositoryUrl || ''
+            const timestamp = (element.Timestamp ?? element.Updated ?? 0)
 
-    console.log(element.Vendor, element.Name, element.Version)
-    await message({
-        process: apm_id,
-        signer: createDataItemSigner(jwk),
-        data: sql,
-        tags: [{ name: "Action", value: "APM.Port" }]
-    })
+            const sql = `INSERT INTO Packages (
+                Vendor,
+                Name,
+                Version,
+                Description,
+                Owner,
+                README,
+                Source,
+                Authors_,
+                Dependencies,
+                Repository,
+                Timestamp,
+                PkgID,
+                Installs,
+                TotalInstalls
+                ) VALUES (
+                    '${sqlEscape(element.Vendor)}',
+                    '${sqlEscape(element.Name)}',
+                    '${sqlEscape(element.Version)}',
+                    '${sqlEscape(element.Description)}',
+                    '${sqlEscape(element.Owner)}',
+                    '${readmeHex}',
+                    '${sourceHex}',
+                    '${element.Authors_ ?? '[]'}',
+                    '${element.Dependencies ?? '{}'}',
+                    '${sqlEscape(repository)}',
+                    ${timestamp},
+                    '<MID>',
+                    ${element.Installs || 0},
+                    ${element.TotalInstalls || 0}
+                );`
+
+            const mid = await message({
+                process: apm_id,
+                signer: createDataItemSigner(jwk),
+                data: sql,
+                tags: [{ name: "Action", value: "APM.Port" }]
+            })
+            console.log("package:", mid, element.Vendor, element.Name, element.Version)
+
+        } catch (err) {
+            console.error("failed to migrate package", element?.Name, err)
+        }
+    }
+
+    console.log("done")
 }
 
-console.log("done")
+await main()
